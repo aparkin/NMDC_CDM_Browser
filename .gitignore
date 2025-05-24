@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.env
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+data/                  # Raw data directory
+processed_data/       # Processed data directory
+*.parquet            # Parquet data files
+*.db                 # Database files
+*.sqlite            # SQLite database files
+study_summary.json   # Generated summary file
+
+# Root level package files (we only need frontend ones)
+package.json
+package-lock.json 

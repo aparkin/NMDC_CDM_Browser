@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict, List
 import logging
+from . import statistics
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,26 +21,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include the statistics router
+app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
+
 # Load processed data
 def load_summary_data() -> Dict:
     try:
         project_root = Path(__file__).parent.parent.parent
         file_path = project_root / "processed_data" / "study_summary.json"
-        logger.info(f"Attempting to load data from: {file_path.absolute()}")
         with open(file_path, "r") as f:
             data = json.load(f)
-            logger.info(f"Successfully loaded data with keys: {list(data.keys())}")
             return data
-    except FileNotFoundError as e:
-        logger.error(f"File not found: {e}")
+    except FileNotFoundError:
         return {
             "summary_stats": {},
             "geographic_distribution": [],
             "measurement_coverage": {},
             "study_cards": []
         }
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error: {e}")
+    except json.JSONDecodeError:
         return {
             "summary_stats": {},
             "geographic_distribution": [],

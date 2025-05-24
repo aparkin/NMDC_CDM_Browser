@@ -49,4 +49,41 @@ study_summary.json   # Generated summary file
 
 # Root level package files (we only need frontend ones)
 package.json
-package-lock.json 
+package-lock.json
+
+# Data directories
+data/
+processed_data/
+
+# Generated files
+study_summary.json
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 

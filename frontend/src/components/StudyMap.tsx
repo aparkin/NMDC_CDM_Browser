@@ -6,6 +6,20 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
+/**
+ * StudyMap Component
+ * 
+ * A React component that displays a map showing study locations and their associated sample points.
+ * Uses Leaflet for map rendering and MarkerCluster for efficient marker management.
+ * 
+ * Features:
+ * - Interactive map with study locations and sample points
+ * - Color-coded markers for different studies
+ * - Clustering of markers for better performance
+ * - Popups with study and sample information
+ * - Automatic bounds fitting to show all markers
+ */
+
 // Fix for default marker icons in Leaflet
 const iconUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png';
 const shadowUrl = 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png';
@@ -33,9 +47,12 @@ const COLORS = [
   '#17becf', // Cyan
 ];
 
-// Helper function to get a consistent color for a study ID
+/**
+ * Generates a consistent color for a study based on its ID
+ * @param studyId - The unique identifier for the study
+ * @returns A hex color code from the COLORS array
+ */
 const getStudyColor = (studyId: string): string => {
-  // Use the last few characters of the study ID to generate a consistent index
   const idNum = parseInt(studyId.replace(/\D/g, ''), 10);
   return COLORS[idNum % COLORS.length];
 };
@@ -80,11 +97,8 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Debug logging
-    console.log('StudyMap received studies:', studies);
-    console.log('Number of studies received:', studies.length);
-    console.log('Studies with valid coordinates:', studies.filter(s => s.latitude && s.longitude));
-    console.log('First study example:', studies[0]);
+    let mapInstance: L.Map | null = null;
+    let markerClusterInstance: L.MarkerClusterGroup | null = null;
 
     try {
       // Initialize map with a slight delay to ensure container is ready
@@ -93,22 +107,22 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
 
         // Initialize map if not already initialized
         if (!map.current) {
-          console.log('Initializing new map');
-          map.current = L.map(mapContainer.current, {
+          mapInstance = L.map(mapContainer.current, {
             center: [37.0902, -95.7129],
             zoom: 3,
             zoomControl: true,
             attributionControl: true
           });
+          map.current = mapInstance;
 
           // Add OpenStreetMap tiles
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
-          }).addTo(map.current);
+          }).addTo(mapInstance);
 
           // Initialize marker cluster group
-          markerCluster.current = L.markerClusterGroup({
+          markerClusterInstance = L.markerClusterGroup({
             maxClusterRadius: 50,
             spiderfyOnMaxZoom: true,
             showCoverageOnHover: false,
@@ -142,11 +156,11 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
               });
             }
           });
+          markerCluster.current = markerClusterInstance;
         }
 
         // Clear existing markers
         if (markerCluster.current) {
-          console.log('Clearing existing markers');
           markerCluster.current.clearLayers();
         }
         markers.current = [];
@@ -155,17 +169,14 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
         const studyGroups = new Map<string, StudyLocation[]>();
         studies.forEach(study => {
           if (study.sample_locations && study.sample_locations.length > 0) {
-            console.log(`Adding study ${study.id} (${study.name}) to groups with ${study.sample_locations.length} samples`);
             studyGroups.set(study.id, [study]);
           }
         });
-        console.log('Number of study groups:', studyGroups.size);
 
         // Add markers for each study group
         studyGroups.forEach((studyGroup, studyId) => {
           const study = studyGroup[0];
           const color = getStudyColor(study.id);
-          console.log(`Creating markers for study ${study.id} (${study.name}) with color ${color}`);
           
           // Create study center marker
           const studyMarker = L.circleMarker([study.latitude, study.longitude], {
@@ -244,24 +255,14 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
         });
 
         // Add cluster group to map
-        if (markerCluster.current) {
-          console.log('Adding cluster group to map with', markers.current.length, 'markers');
+        if (markerCluster.current && map.current) {
           map.current.addLayer(markerCluster.current);
         }
 
-        // Debug logging
-        console.log('Total markers added:', markers.current.length);
-        console.log('Map center:', map.current.getCenter());
-        console.log('Map zoom:', map.current.getZoom());
-        console.log('Map bounds:', map.current.getBounds());
-
         // Fit map to markers if we have any
-        if (markers.current.length > 0) {
+        if (map.current && markers.current.length > 0) {
           const group = L.featureGroup(markers.current);
-          map.current.fitBounds(group.getBounds().pad(0.1));
-          console.log('Fitted map to markers');
-        } else {
-          console.log('No markers to fit bounds to');
+          map.current.fitBounds(group.getBounds().pad(0.005));
         }
 
         setLoading(false);
@@ -273,13 +274,13 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies }) => {
 
     // Cleanup function
     return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
       if (markerCluster.current) {
         markerCluster.current.clearLayers();
         markerCluster.current = null;
+      }
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
       }
       markers.current = [];
     };

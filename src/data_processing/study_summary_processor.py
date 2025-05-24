@@ -1,7 +1,7 @@
 import pandas as pd
 import dask.dataframe as dd
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 import json
 from datetime import datetime
 import logging
@@ -10,6 +10,20 @@ import numpy as np
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def convert_numpy_types(obj: Any) -> Any:
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
 
 class StudySummaryProcessor:
     def __init__(self, data_dir: Optional[str] = None):
@@ -54,15 +68,23 @@ class StudySummaryProcessor:
         # Check study table for processed flags
         study = self.study_df[self.study_df['id'] == study_id].iloc[0]
         
-        if study.get('proteomics_processed'):
-            measurement_types.append('proteomics')
-        if study.get('metabolomics_processed'):
+        # Check both metabolomics_processed and metabolomics_analysis
+        metabolomics_count = study.get('metabolomics_processed')
+        metabolomics_analysis = study.get('metabolomics_analysis', 0)
+        has_metabolomics = (
+            (metabolomics_count is not None and not pd.isna(metabolomics_count) and metabolomics_count > 0) or 
+            metabolomics_analysis > 0
+        )
+        if has_metabolomics:
             measurement_types.append('metabolomics')
-        if study.get('lipidomics_processed'):
+            
+        if study.get('proteomics_processed', 0) > 0:
+            measurement_types.append('proteomics')
+        if study.get('lipidomics_processed', 0) > 0:
             measurement_types.append('lipidomics')
-        if study.get('metagenome_processed'):
+        if study.get('metagenome_processed', 0) > 0:
             measurement_types.append('metagenomics')
-        if study.get('metatranscriptome_processed'):
+        if study.get('metatranscriptome_processed', 0) > 0:
             measurement_types.append('metatranscriptomics')
             
         return measurement_types
@@ -215,66 +237,64 @@ class StudySummaryProcessor:
         
         return features
     
+    def _get_quantitative_measurements(self, study_id: str) -> Dict[str, int]:
+        """Get quantitative measurements for a study"""
+        study_samples = self.sample_df[self.sample_df['study_id'] == study_id]
+        quantitative_measurements = {}
+        
+        for col in self.sample_df.columns:
+            if col.startswith("has_") and col.endswith("_measurement"):
+                measurement_type = col[4:-12]  # Remove 'has_' prefix and '_measurement' suffix
+                count = study_samples[col].sum()
+                if count > 0:
+                    quantitative_measurements[measurement_type] = int(count)
+        
+        return quantitative_measurements
+
     def generate_study_cards(self) -> List[Dict]:
         """Generate data for study cards"""
-        logger.info("Generating study cards...")
+        # Helper function to safely convert measurement counts
+        def safe_int_convert(value, default=0):
+            try:
+                if pd.isna(value):
+                    return default
+                result = int(float(value))
+                return result
+            except (ValueError, TypeError):
+                return default
         
-        study_cards = []
+        # Get geographic distribution data
+        geo_data = self.get_geographic_distribution()
+        geo_by_study = {}
+        for loc in geo_data:
+            study_id = loc['study_id']
+            if study_id not in geo_by_study:
+                geo_by_study[study_id] = []
+            geo_by_study[study_id].append(loc)
         
+        cards = []
         for _, study in self.study_df.iterrows():
             study_id = str(study["id"])  # Ensure study_id is a string
-            # Get samples for this study
-            study_samples = self.sample_df[self.sample_df["study_id"] == study_id]
-            
-            # Get primary ecosystem
-            primary_ecosystem = study_samples["ecosystem"].mode().iloc[0] if not study_samples["ecosystem"].empty else None
-            
-            # Get quantitative measurements
-            quantitative_measurements = {}
-            for col in self.sample_df.columns:
-                if col.startswith("has_") and col.endswith("_measurement"):
-                    measurement_type = col[4:-12]  # Remove 'has_' prefix and '_measurement' suffix
-                    count = study_samples[col].sum()
-                    if count > 0:
-                        quantitative_measurements[measurement_type] = int(count)
-            
-            # Get geographic data
-            geo_samples = study_samples[
-                study_samples["latitude"].notna() & 
-                study_samples["longitude"].notna()
-            ]
-            
-            # Calculate average coordinates if available
-            latitude = geo_samples["latitude"].mean() if not geo_samples.empty else None
-            longitude = geo_samples["longitude"].mean() if not geo_samples.empty else None
             
             # Get unique sample locations
-            unique_locations = geo_samples.groupby(["latitude", "longitude"]).size().reset_index()
-            sample_locations = []
-            for _, location in unique_locations.iterrows():
-                sample_locations.append({
-                    "latitude": float(location["latitude"]),
-                    "longitude": float(location["longitude"])
-                })
+            study_samples = self.sample_df[self.sample_df['study_id'] == study_id]
+            unique_locations = study_samples[['latitude', 'longitude']].drop_duplicates()
             
-            # Helper function to safely convert measurement counts
-            def safe_int_convert(value, default=0):
-                try:
-                    if pd.isna(value):
-                        return default
-                    return int(float(value))
-                except (ValueError, TypeError):
-                    return default
+            # Get primary ecosystem
+            primary_ecosystem = study.get('primary_ecosystem', 'Unknown')
+            
+            # Get geographic data for this study
+            study_geo = geo_by_study.get(study_id, [])
+            first_location = study_geo[0] if study_geo else None
             
             card = {
                 "id": study_id,
                 "name": study["name"],
                 "description": study.get("description", ""),
-                "sample_count": len(unique_locations),  # Count unique locations instead of all samples
+                "sample_count": len(unique_locations),
                 "measurement_types": self.get_measurement_types(study_id),
                 "primary_ecosystem": primary_ecosystem,
                 "add_date": study["add_date"].isoformat() if pd.notnull(study["add_date"]) else None,
-                # Add new fields with safe conversion
                 "lipidomics_processed": safe_int_convert(study.get("lipidomics_processed")),
                 "mags_analysis": safe_int_convert(study.get("mags_analysis")),
                 "metabolomics_processed": safe_int_convert(study.get("metabolomics_processed")),
@@ -288,16 +308,15 @@ class StudySummaryProcessor:
                 "ecosystem_category": study.get("ecosystem_category"),
                 "ecosystem_subtype": study.get("ecosystem_subtype"),
                 "ecosystem_type": study.get("ecosystem_type"),
-                "quantitative_measurements": quantitative_measurements,
-                # Add geographic data
-                "latitude": float(latitude) if latitude is not None else None,
-                "longitude": float(longitude) if longitude is not None else None,
-                "sample_locations": sample_locations
+                "quantitative_measurements": self._get_quantitative_measurements(study_id),
+                "latitude": first_location['latitude'] if first_location else None,
+                "longitude": first_location['longitude'] if first_location else None,
+                "sample_locations": study_geo
             }
-            study_cards.append(card)
-        
-        logger.info(f"Generated {len(study_cards)} study cards")
-        return study_cards
+            
+            cards.append(card)
+            
+        return cards
     
     def process_all(self) -> Dict:
         """Process all data and return complete summary"""
@@ -320,6 +339,9 @@ if __name__ == "__main__":
         
         summary_data = processor.process_all()
         logger.info("Got summary data, size: %d bytes", len(str(summary_data)))
+        
+        # Convert numpy types to Python native types
+        summary_data = convert_numpy_types(summary_data)
         
         # Create processed_data directory if it doesn't exist
         output_dir = Path("processed_data")

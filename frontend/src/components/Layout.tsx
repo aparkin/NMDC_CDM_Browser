@@ -235,11 +235,21 @@ const Layout = ({ children }: LayoutProps) => {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'hidden',
+          maxWidth: { sm: `calc(100vw - ${drawerWidth}px)` }
         }}
       >
         <Toolbar />
-        {children}
+        <Box sx={{ 
+          flex: 1,
+          width: '100%',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

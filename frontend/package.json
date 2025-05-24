@@ -19,6 +19,8 @@
     "@types/mapbox-gl": "^3.4.1",
     "@types/plotly.js": "^2.12.25",
     "@types/react-plotly.js": "^2.6.3",
+    "@types/react-resizable": "^3.0.8",
+    "@types/react-split-pane": "^0.1.10",
     "axios": "^1.9.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
@@ -27,7 +29,9 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-plotly.js": "^2.6.0",
+    "react-resizable": "^3.0.5",
     "react-router-dom": "^7.6.0",
+    "react-split-pane": "^0.1.92",
     "recharts": "^2.15.3"
   },
   "devDependencies": {

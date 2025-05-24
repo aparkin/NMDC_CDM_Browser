@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StudyList from './components/StudyList';
 import Layout from './components/Layout';
 import StudySetSummary from './pages/StudySetSummary';
@@ -18,20 +19,32 @@ const theme = createTheme({
   },
 });
 
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<StudyList />} />
-            <Route path="/studies/:studyId" element={<StudyDashboard />} />
-            <Route path="/set" element={<StudySetSummary />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<StudyList />} />
+              <Route path="/studies/:studyId" element={<StudyDashboard />} />
+              <Route path="/set" element={<StudySetSummary />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

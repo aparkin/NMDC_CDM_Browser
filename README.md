@@ -1,82 +1,138 @@
 # NMDC CDM Browser
 
-A web application for browsing and visualizing data from the National Microbiome Data Collaborative (NMDC) Common Data Model (CDM).
+A web application for browsing and analyzing data from the National Microbiome Data Collaborative (NMDC) Common Data Model (CDM).
 
 ## Features
 
 - Interactive map visualization of study locations
-- Study cards with detailed information
-- Statistical summaries of studies and samples
-- Search and filter capabilities
-- Detailed study information pages
+- Detailed study information and metadata
+- Statistical analysis of omics data
+- Timeline visualization of data collection
+- Ecosystem distribution analysis
+- Physical variable statistics
+- Omics data analysis (metabolomics, lipidomics, proteomics)
+- Taxonomic analysis
 
 ## Project Structure
 
 ```
 .
-├── data/                  # Raw data files (parquet format)
+├── data/                  # Raw data files
 ├── frontend/             # React frontend application
 ├── processed_data/       # Processed data files
-└── src/                  # Python backend code
-    ├── api/             # FastAPI backend
-    └── data_processing/ # Data processing scripts
+├── src/                  # Backend code
+│   ├── api/             # API endpoints
+│   ├── data_processing/ # Data processing modules
+│   └── utils/           # Utility functions
+└── docs/                # Documentation
+    ├── api.md          # API documentation
+    └── architecture.md # System architecture
 ```
+
+## Documentation
+
+- [API Documentation](docs/api.md)
+- [System Architecture](docs/architecture.md)
+
+## Dependencies
+
+### Frontend Dependencies
+
+#### Core
+- React 18.2.0
+- TypeScript 5.3.3
+- Material-UI (MUI) 7.0.0
+- React Router 7.0.0
+- React Query (TanStack Query) 5.0.0
+
+#### Visualization
+- Leaflet.js 1.9.4
+- Leaflet.MarkerCluster 1.5.3
+- Plotly.js 2.29.0
+- Recharts 2.15.3
+
+#### Development
+- Vite 5.0.0
+- ESLint 8.56.0
+- TypeScript ESLint 7.0.0
+- Prettier 3.2.0
+
+### Backend Dependencies
+
+#### Core
+- FastAPI 0.109.0
+- Uvicorn 0.27.0
+- Python 3.11+
+
+#### Data Processing
+- Pandas 2.2.0
+- Dask 2024.1.0
+- NumPy 1.26.0
+- PyArrow 15.0.0
+
+#### Development
+- Black 24.1.0
+- isort 5.13.0
+- mypy 1.8.0
+- pytest 8.0.0
 
 ## Setup
 
 ### Backend Setup
 
-1. Create a Python virtual environment:
+1. Create a virtual environment:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-2. Install Python dependencies:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Process the data:
+3. Start the backend server:
    ```bash
-   cd src/data_processing
-   python process_data.py
-   ```
-
-4. Start the backend server:
-   ```bash
-   cd src/api
-   python main.py
+   uvicorn src.api.main:app --reload
    ```
 
 ### Frontend Setup
 
-1. Install Node.js dependencies:
+1. Navigate to the frontend directory:
    ```bash
    cd frontend
+   ```
+
+2. Install dependencies:
+   ```bash
    npm install
    ```
 
-2. Start the development server:
+3. Start the development server:
    ```bash
-   npm start
+   npm run dev
    ```
 
 ## Usage
 
-1. The backend API will be available at `http://localhost:8000`
-2. The frontend application will be available at `http://localhost:3000`
+1. Access the application at `http://localhost:5173`
+2. Use the map interface to explore study locations
+3. Click on markers to view study details
+4. Use the statistics view to analyze omics data
+5. Filter and search studies using the study list
 
 ## API Endpoints
 
-- `/api/studies/summary` - Get summary statistics
-- `/api/studies/geographic` - Get geographic distribution data
-- `/api/studies/cards` - Get study card data
-- `/api/studies/{study_id}` - Get detailed study information
+See [API Documentation](docs/api.md) for detailed endpoint information.
 
-## Development
+## Contributing
 
-- Backend code is in Python using FastAPI
-- Frontend code is in TypeScript using React
-- Data processing is done using pandas and dask
-- Map visualization uses Leaflet.js 
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

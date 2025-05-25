@@ -12,6 +12,7 @@ A web application for browsing and analyzing data from the National Microbiome D
 - Physical variable statistics
 - Omics data analysis (metabolomics, lipidomics, proteomics)
 - Taxonomic analysis
+- AI-generated compendium summary with comprehensive analysis
 
 ## Project Structure
 
@@ -120,6 +121,7 @@ A web application for browsing and analyzing data from the National Microbiome D
 3. Click on markers to view study details
 4. Use the statistics view to analyze omics data
 5. Filter and search studies using the study list
+6. View the AI-generated summary for a comprehensive analysis of the compendium
 
 ## API Endpoints
 

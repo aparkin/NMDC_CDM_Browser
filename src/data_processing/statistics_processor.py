@@ -17,16 +17,16 @@ class StatisticsProcessor:
         # Get the project root directory (2 levels up from this file)
         project_root = Path(__file__).parent.parent.parent
         self.data_dir = Path(data_dir) if data_dir else project_root / "data"
-        logger.info(f"Using data directory: {self.data_dir.absolute()}")
+        logger.info(f"Initialized StatisticsProcessor with data directory: {self.data_dir.absolute()}")
         self._cache = {}
         
     def _load_parquet(self, filename: str) -> pd.DataFrame:
         """Lazy load parquet data with caching"""
         if filename not in self._cache:
-            logger.info(f"Loading {filename}...")
+            logger.debug(f"Loading {filename}...")
             file_path = self.data_dir / filename
             df = pd.read_parquet(file_path)
-            logger.info(f"Loaded {len(df)} rows from {filename}")
+            logger.debug(f"Loaded {len(df)} rows from {filename}")
             self._cache[filename] = df
         return self._cache[filename]
     
@@ -96,7 +96,7 @@ class StatisticsProcessor:
     
     def get_ecosystem_statistics(self, variable: str) -> Dict:
         """Get statistics for a specific ecosystem variable"""
-        logger.info(f"Generating ecosystem statistics for {variable}...")
+        logger.info(f"Processing ecosystem statistics for {variable}")
         samples_df = self._load_parquet("sample_table_snappy.parquet")
         
         valid_variables = [
@@ -106,7 +106,7 @@ class StatisticsProcessor:
         ]
         
         if variable not in valid_variables:
-            logger.warning(f"Invalid ecosystem variable: {variable}")
+            logger.warning(f"Invalid ecosystem variable requested: {variable}")
             return {
                 'variable': variable,
                 'value_counts': {},
@@ -117,7 +117,7 @@ class StatisticsProcessor:
         
         # Check if column exists
         if variable not in samples_df.columns:
-            logger.warning(f"Column {variable} not found in sample table. Available columns: {samples_df.columns.tolist()}")
+            logger.warning(f"Column {variable} not found in sample table")
             return {
                 'variable': variable,
                 'value_counts': {},
@@ -130,8 +130,8 @@ class StatisticsProcessor:
         value_counts = samples_df[variable].fillna("Unknown").value_counts().to_dict()
         total_samples = len(samples_df)
         
-        # Log the value counts for debugging
-        logger.info(f"Value counts for {variable}: {value_counts}")
+        # Log the value counts at debug level
+        logger.debug(f"Value counts for {variable}: {value_counts}")
         
         return {
             'variable': variable,

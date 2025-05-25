@@ -5,17 +5,36 @@ from pathlib import Path
 from typing import Dict, List
 import logging
 from . import statistics
+from . import llm_summarizer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="NMDC CDM Browser API")
+app = FastAPI(
+    title="NMDC CDM Browser API",
+    description="""
+    API for the NMDC CDM Browser application. This API provides access to study metadata,
+    statistics, and analysis results for the National Microbiome Data Collaborative (NMDC)
+    Common Data Model (CDM) Browser.
+    
+    ## Features
+    * Study metadata and summaries
+    * Geographic distribution of samples
+    * Statistical analysis of ecosystem and physical variables
+    * Omics data analysis
+    * Taxonomic analysis
+    * AI-generated summaries
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["http://localhost:3000", "http://localhost:5174"],  # Allow both development ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,6 +45,16 @@ app.include_router(statistics.router, prefix="/api/statistics", tags=["statistic
 
 # Load processed data
 def load_summary_data() -> Dict:
+    """
+    Load the processed study summary data from JSON file.
+    
+    Returns:
+        Dict: A dictionary containing:
+            - summary_stats: Overall statistics about studies
+            - geographic_distribution: Sample locations and counts
+            - measurement_coverage: Coverage of different measurement types
+            - study_cards: Detailed information about each study
+    """
     try:
         project_root = Path(__file__).parent.parent.parent
         file_path = project_root / "processed_data" / "study_summary.json"
@@ -33,6 +62,7 @@ def load_summary_data() -> Dict:
             data = json.load(f)
             return data
     except FileNotFoundError:
+        logger.warning("Study summary file not found, returning empty data")
         return {
             "summary_stats": {},
             "geographic_distribution": [],
@@ -40,6 +70,7 @@ def load_summary_data() -> Dict:
             "study_cards": []
         }
     except json.JSONDecodeError:
+        logger.error("Error decoding study summary JSON")
         return {
             "summary_stats": {},
             "geographic_distribution": [],
@@ -56,11 +87,35 @@ async def get_study_summary():
     data = load_summary_data()
     return data["summary_stats"]
 
-@app.get("/api/studies/geographic")
+@app.get("/api/studies/geographic",
+    response_model=List[Dict],
+    summary="Get geographic distribution",
+    description="Retrieve the geographic distribution of all samples across studies",
+    responses={
+        200: {
+            "description": "Geographic distribution retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [{
+                        "latitude": 37.7749,
+                        "longitude": -122.4194,
+                        "study_id": "nmdc:sty-11-34xj1150",
+                        "sample_count": 10
+                    }]
+                }
+            }
+        }
+    }
+)
 async def get_geographic_distribution():
+    """
+    Get the geographic distribution of all samples.
+    
+    Returns:
+        List[Dict]: List of locations with sample counts
+    """
     logger.info("Fetching geographic distribution data")
     data = load_summary_data()
-    logger.info(f"Geographic distribution data keys: {list(data.keys())}")
     return data["geographic_distribution"]
 
 @app.get("/api/studies/measurements")
@@ -73,13 +128,100 @@ async def get_study_cards():
     data = load_summary_data()
     return data["study_cards"]
 
-@app.get("/api/studies/{study_id}")
-async def get_study_details(study_id: str):
+@app.get("/api/studies/{study_id}", 
+    response_model=Dict,
+    summary="Get study details",
+    description="Retrieve detailed information about a specific study by its ID",
+    responses={
+        200: {
+            "description": "Study details retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "nmdc:sty-11-34xj1150",
+                        "name": "Example Study",
+                        "description": "Study description",
+                        "sample_count": 100
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Study not found"
+        }
+    }
+)
+async def get_study(study_id: str):
+    """
+    Get detailed information about a specific study.
+    
+    Args:
+        study_id (str): The unique identifier of the study
+        
+    Returns:
+        Dict: Study details including metadata and statistics
+        
+    Raises:
+        HTTPException: If study is not found
+    """
+    logger.info(f"Fetching study details for {study_id}")
     data = load_summary_data()
-    for card in data["study_cards"]:
-        if card["id"] == study_id:
-            return card
-    raise HTTPException(status_code=404, detail="Study not found")
+    study = next((s for s in data["study_cards"] if s["id"] == study_id), None)
+    
+    if not study:
+        logger.warning(f"Study not found: {study_id}")
+        raise HTTPException(status_code=404, detail=f"Study {study_id} not found")
+        
+    return study
+
+@app.get("/api/summary/ai",
+    response_model=Dict,
+    summary="Get AI-generated summary",
+    description="Retrieve an AI-generated summary of the compendium's scope and findings",
+    responses={
+        200: {
+            "description": "AI summary retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "summary": "Comprehensive analysis of the compendium...",
+                        "last_updated": "2024-03-21T12:00:00Z",
+                        "data_version": "1.0.0",
+                        "token_count": 1000
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_ai_summary(force: bool = False):
+    """
+    Get an AI-generated summary of the compendium.
+    
+    Args:
+        force (bool): If True, force generation of a new summary even if cached
+        
+    Returns:
+        Dict: AI-generated summary with metadata
+        
+    Raises:
+        HTTPException: If summary generation fails
+    """
+    try:
+        # Check for cached summary first, unless force refresh is requested
+        if not force:
+            cache_path = Path(__file__).parent.parent.parent / "processed_data" / "ai_summary.json"
+            if cache_path.exists():
+                with open(cache_path, "r") as f:
+                    cached = json.load(f)
+                    return cached
+        
+        # Generate new summary
+        return llm_summarizer.llm_service.generate_summary()
+        
+    except Exception as e:
+        logger.error(f"Error generating AI summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,10 +2,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 import logging
 from . import statistics
 from . import llm_summarizer
+from .study_analysis import router as study_analysis_router
+from .routers import studies
+from ..data_processing.study_analysis_processor import StudyAnalysisProcessor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +37,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5174"],  # Allow both development ports
+    allow_origins=["*"],  # Allow all origins in development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +45,12 @@ app.add_middleware(
 
 # Include the statistics router
 app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
+
+# Include the study analysis router
+app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
+
+# Include the studies router
+app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
 
 # Load processed data
 def load_summary_data() -> Dict:
@@ -221,6 +230,21 @@ async def get_ai_summary(force: bool = False):
         
     except Exception as e:
         logger.error(f"Error generating AI summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/test/physical-variable/{study_id}/{variable}")
+async def test_physical_variable(study_id: str, variable: str):
+    """Test endpoint for processing a single physical variable."""
+    try:
+        processor = StudyAnalysisProcessor()
+        study_samples = processor._get_study_samples(study_id)
+        result = processor._process_physical_variables(study_id, study_samples)
+        if variable in result:
+            return result[variable]
+        else:
+            return {"error": f"Variable {variable} not found in study {study_id}"}
+    except Exception as e:
+        logger.error(f"Error processing variable {variable} for study {study_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import logging
 from study_summary_processor import StudySummaryProcessor
 from pathlib import Path
+import numpy as np
 
 # Configure logging
 logging.basicConfig(
@@ -8,6 +9,20 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def convert_numpy_types(obj):
+    """Convert NumPy types to Python native types."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
 
 def main():
     try:
@@ -30,6 +45,9 @@ def main():
             "geographic_distribution": geographic_distribution,
             "study_cards": study_cards
         }
+        
+        # Convert NumPy types to Python native types
+        summary_data = convert_numpy_types(summary_data)
         
         # Log the structure of the data
         logger.info(f"Summary stats keys: {list(summary_stats.keys())}")

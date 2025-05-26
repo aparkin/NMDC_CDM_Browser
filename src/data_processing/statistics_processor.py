@@ -461,13 +461,13 @@ class StatisticsProcessor:
         try:
             if analysis_type == 'contigs':
                 df = self._load_parquet("contigs_rollup_table_snappy.parquet")
-                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'abundance', 'species_count'])
+                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'abundance', 'species_count'], analysis_type)
             elif analysis_type == 'centrifuge':
                 df = self._load_parquet("centrifuge_rollup_table_snappy.parquet")
-                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'label', 'numReads', 'abundance', 'species_count'])
+                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'label', 'numReads', 'abundance', 'species_count'], analysis_type)
             elif analysis_type == 'kraken':
                 df = self._load_parquet("kraken_table_snappy.parquet")
-                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'name', 'abundance'])
+                return self._process_taxonomic_data(df, valid_ranks, ['rank', 'lineage', 'name', 'abundance'], analysis_type)
             elif analysis_type == 'gottcha':
                 df = self._load_parquet("gottcha_table_snappy.parquet")
                 logger.info(f"Gottcha columns: {df.columns.tolist()}")
@@ -539,7 +539,7 @@ class StatisticsProcessor:
             logger.error(f"Error in get_taxonomic_statistics: {str(e)}")
             raise
 
-    def _process_taxonomic_data(self, df: pd.DataFrame, valid_ranks: List[str], columns: List[str]) -> Dict[str, List[Dict]]:
+    def _process_taxonomic_data(self, df: pd.DataFrame, valid_ranks: List[str], columns: List[str], analysis_type: str) -> Dict[str, List[Dict]]:
         """Process taxonomic data with robust NaN handling"""
         result = {}
         
@@ -568,13 +568,13 @@ class StatisticsProcessor:
             # Calculate mean and std for each column separately
             mean_stats = rank_df.groupby('lineage').agg({
                 'abundance': 'mean',
-                **({'species_count': 'mean'} if 'species_count' in columns else {}),
+                **({'species_count': 'mean'} if 'species_count' in columns and analysis_type in ['contigs', 'centrifuge'] else {}),
                 **({'read_count': 'mean'} if 'read_count' in columns else {})
             })
             
             std_stats = rank_df.groupby('lineage').agg({
                 'abundance': 'std',
-                **({'species_count': 'std'} if 'species_count' in columns else {}),
+                **({'species_count': 'std'} if 'species_count' in columns and analysis_type in ['contigs', 'centrifuge'] else {}),
                 **({'read_count': 'std'} if 'read_count' in columns else {})
             })
             
@@ -598,7 +598,7 @@ class StatisticsProcessor:
                     'std_abundance': float(row['abundance_std'])
                 }
                 
-                if 'species_count' in columns:
+                if 'species_count' in columns and analysis_type in ['contigs', 'centrifuge']:
                     result_dict.update({
                         'mean_species_count': float(row.get('species_count_mean', 0)),
                         'std_species_count': float(row.get('species_count_std', 0))

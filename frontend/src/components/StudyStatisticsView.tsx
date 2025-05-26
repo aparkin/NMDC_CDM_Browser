@@ -92,6 +92,11 @@ interface AnalysisData {
     top10: Record<string, Record<string, OmicsItem[]>>;
     outliers: Record<string, Record<string, OmicsItem[]>>;
   };
+  ecosystem: {
+    ecosystem_data: Record<string, string[]>;
+    sample_counts: Record<string, Record<string, number>>;
+    most_common: Record<string, string>;
+  };
 }
 
 interface TableColumn {
@@ -99,6 +104,14 @@ interface TableColumn {
   label: string;
   align?: 'left' | 'right' | 'center' | 'inherit' | 'justify';
 }
+
+const ECOSYSTEM_VARIABLES = [
+  'ecosystem',
+  'ecosystem_category',
+  'ecosystem_type',
+  'ecosystem_subtype',
+  'specific_ecosystem'
+];
 
 const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -110,6 +123,7 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   const [taxonomicTabValue, setTaxonomicTabValue] = useState(0);
   const [sortField, setSortField] = useState<keyof OmicsItem>('effect_size');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selectedEcosystemVar, setSelectedEcosystemVar] = useState(ECOSYSTEM_VARIABLES[0]);
 
   // Fetch study analysis data
   const analysisQuery = useQuery({
@@ -159,6 +173,10 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
 
   const handleRankChange = (event: SelectChangeEvent) => {
     setSelectedRank(event.target.value);
+  };
+
+  const handleEcosystemVarChange = (event: SelectChangeEvent) => {
+    setSelectedEcosystemVar(event.target.value);
   };
 
   const handleSort = (field: keyof OmicsItem) => {
@@ -731,10 +749,74 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
     );
   };
 
+  const renderEcosystem = () => {
+    const eco = analysisQuery.data?.ecosystem;
+    if (!eco || !eco.ecosystem_data) {
+      return (
+        <Box sx={{ p: 2 }}>
+          <Alert severity="info">No ecosystem data available for this study.</Alert>
+        </Box>
+      );
+    }
+    const counts = eco.sample_counts?.[selectedEcosystemVar] || {};
+    const mostCommon = eco.most_common?.[selectedEcosystemVar] || '';
+    const countEntries = Object.entries(counts).map(([value, count]) => [value, Number(count)] as [string, number]);
+    const totalSamples = countEntries.reduce((a, b) => a + b[1], 0);
+    
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Ecosystem Variable: {selectedEcosystemVar.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </Typography>
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Select Ecosystem Variable</InputLabel>
+          <Select
+            value={selectedEcosystemVar}
+            onChange={handleEcosystemVarChange}
+            label="Select Ecosystem Variable"
+          >
+            {ECOSYSTEM_VARIABLES.map(v => (
+              <MenuItem key={v} value={v}>
+                {v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Typography variant="subtitle2" gutterBottom>Total Samples: {totalSamples}</Typography>
+        <Typography variant="subtitle2" gutterBottom>Most Common: {mostCommon || 'N/A'}</Typography>
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Value</TableCell>
+                <TableCell align="right">Count</TableCell>
+                <TableCell align="right">Percentage</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {countEntries
+                .sort(([, a], [, b]) => (b as number) - (a as number))
+                .map(([value, count]) => (
+                  <TableRow key={value}>
+                    <TableCell>{String(value)}</TableCell>
+                    <TableCell align="right">{count}</TableCell>
+                    <TableCell align="right">
+                      {totalSamples > 0 ? ((count / totalSamples) * 100).toFixed(1) + '%' : '0%'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+    );
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Tabs value={activeTab} onChange={handleTabChange}>
         <Tab label="Timeline" />
+        <Tab label="Ecosystem" />
         <Tab label="Physical Variables" />
         <Tab label="Omics" />
         <Tab label="Taxonomic" />
@@ -742,9 +824,10 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
 
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
         {activeTab === 0 && renderTimeline()}
-        {activeTab === 1 && renderPhysicalVariables()}
-        {activeTab === 2 && renderOmics()}
-        {activeTab === 3 && renderTaxonomic()}
+        {activeTab === 1 && renderEcosystem()}
+        {activeTab === 2 && renderPhysicalVariables()}
+        {activeTab === 3 && renderOmics()}
+        {activeTab === 4 && renderTaxonomic()}
       </Box>
     </Box>
   );

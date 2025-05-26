@@ -4,7 +4,7 @@ Extends the base StatisticsProcessor to provide study-specific statistics
 with comparisons to the overall compendium.
 """
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
 from scipy.stats import mannwhitneyu
 import pandas as pd
@@ -847,10 +847,44 @@ class StudyAnalysisProcessor(StatisticsProcessor):
         # Placeholder for now - will implement in Stage 2
         return {}
         
-    def _process_ecosystem(self, study_id: str, study_samples: pd.DataFrame) -> Dict:
+    def _process_ecosystem(self, study_id: str, study_samples: pd.DataFrame) -> Dict[str, Any]:
         """Process ecosystem data for a study."""
-        # Placeholder for now - will implement in Stage 2
-        return {}
+        try:
+            # Get unique ecosystem values
+            ecosystem_data: Dict[str, List[str]] = {
+                'ecosystem': study_samples['ecosystem'].unique().tolist() if 'ecosystem' in study_samples.columns else [],
+                'ecosystem_category': study_samples['ecosystem_category'].unique().tolist() if 'ecosystem_category' in study_samples.columns else [],
+                'ecosystem_type': study_samples['ecosystem_type'].unique().tolist() if 'ecosystem_type' in study_samples.columns else [],
+                'ecosystem_subtype': study_samples['ecosystem_subtype'].unique().tolist() if 'ecosystem_subtype' in study_samples.columns else [],
+                'specific_ecosystem': study_samples['specific_ecosystem'].unique().tolist() if 'specific_ecosystem' in study_samples.columns else []
+            }
+            
+            # Remove empty lists and None values
+            ecosystem_data = {k: [v for v in vals if v is not None] for k, vals in ecosystem_data.items() if vals}
+            
+            # Get the most common value for each ecosystem type
+            most_common: Dict[str, str] = {}
+            for col in ['ecosystem', 'ecosystem_category', 'ecosystem_type', 'ecosystem_subtype', 'specific_ecosystem']:
+                if col in study_samples.columns:
+                    value_counts = study_samples[col].value_counts()
+                    if not value_counts.empty:
+                        most_common[col] = str(value_counts.index[0])
+            
+            # Get sample counts for each ecosystem type
+            sample_counts: Dict[str, Dict[str, int]] = {}
+            for col in ['ecosystem', 'ecosystem_category', 'ecosystem_type', 'ecosystem_subtype', 'specific_ecosystem']:
+                if col in study_samples.columns:
+                    sample_counts[col] = {str(k): int(v) for k, v in study_samples[col].value_counts().to_dict().items()}
+            
+            return {
+                'ecosystem_data': ecosystem_data,
+                'most_common': most_common,
+                'sample_counts': sample_counts
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing ecosystem data for study {study_id}: {str(e)}")
+            return {}
         
     def _process_map_data(self, study_id: str, study_samples: pd.DataFrame) -> Dict:
         """Process map data for a study using individual sample locations."""

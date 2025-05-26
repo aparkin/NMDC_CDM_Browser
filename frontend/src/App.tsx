@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StudyList from './components/StudyList';
 import Layout from './components/Layout';
 import StudySetSummary from './pages/StudySetSummary';
-import StudyDashboard from './pages/StudyDashboard';
+import StudyDetail from './pages/StudyDetail';
 
 // Create a theme instance
 const theme = createTheme({
@@ -38,7 +38,7 @@ function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<StudyList />} />
-              <Route path="/studies/:studyId" element={<StudyDashboard />} />
+              <Route path="/studies/:studyId" element={<StudyDetail />} />
               <Route path="/set" element={<StudySetSummary />} />
             </Routes>
           </Layout>

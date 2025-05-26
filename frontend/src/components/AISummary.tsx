@@ -19,7 +19,7 @@ const AISummary: React.FC = () => {
   const fetchSummary = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/summary/ai${forceRefresh ? '?force=true' : ''}`);
+      const response = await fetch(`http://localhost:8000/api/summary/ai${forceRefresh ? '?force=true' : ''}`);
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error:', errorText);

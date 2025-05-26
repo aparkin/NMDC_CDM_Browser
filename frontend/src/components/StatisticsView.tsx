@@ -425,20 +425,8 @@ const StatisticsView: React.FC = () => {
     );
   };
 
-  // Add effect to monitor state changes
-  React.useEffect(() => {
-    console.log('Ecosystem state updated:', {
-      selectedEcosystem,
-      isValid: ECOSYSTEM_VARIABLES.includes(selectedEcosystem)
-    });
-  }, [selectedEcosystem]);
-
-  React.useEffect(() => {
-    console.log('Physical state updated:', {
-      selectedPhysical,
-      isValid: PHYSICAL_VARIABLES.includes(selectedPhysical)
-    });
-  }, [selectedPhysical]);
+  // Remove debug logging effects
+  // The state changes can be monitored through React DevTools if needed
 
   return (
     <Box sx={{ 

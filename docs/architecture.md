@@ -79,6 +79,98 @@ The NMDC CDM Browser is a full-stack web application designed to visualize and a
 - Error handling and recovery
 - Data validation and sanitization
 
+### Data Processing and Cache Management
+
+#### Cache Locations
+- `processed_data/study_analysis_cache/`: Contains individual study analysis results
+- `processed_data/study_summary.json`: Contains overall study summary data
+
+#### Cache Clearing Procedures
+When making changes to data processing logic (e.g., species count calculations, taxonomic analysis), follow these steps:
+
+1. Clear the cache files:
+   ```bash
+   rm -rf processed_data/study_analysis_cache/* processed_data/study_summary.json
+   ```
+
+2. Regenerate the data:
+   ```bash
+   python src/data_processing/process_data.py
+   ```
+
+This ensures that:
+- Individual study analyses are recalculated with updated logic
+- Study-wide statistics are regenerated
+- All data tables and visualizations reflect the latest processing methods
+
+Note: The preprocessing script handles:
+- Loading and processing sample data
+- Generating study summaries
+- Creating geographic distributions
+- Calculating statistical measures
+
+### Application Startup Procedures
+
+#### Development Environment Setup
+1. **Data Processing**
+   - Ensure all raw data files are in the `data/` directory
+   - Run preprocessing to generate initial cache:
+     ```bash
+     python src/data_processing/process_data.py
+     ```
+   - Verify `processed_data/study_summary.json` and `processed_data/study_analysis_cache/` are populated
+
+2. **Backend Startup**
+   - Activate Python virtual environment:
+     ```bash
+     source venv/bin/activate  # Unix/MacOS
+     # or
+     .\venv\Scripts\activate  # Windows
+     ```
+   - Install dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+   - Start the FastAPI backend:
+     ```bash
+     uvicorn src.main:app --reload
+     ```
+   - Verify backend is running at `http://localhost:8000`
+
+3. **Frontend Startup**
+   - Install Node.js dependencies:
+     ```bash
+     cd frontend
+     npm install
+     ```
+   - Start the development server:
+     ```bash
+     npm start
+     ```
+   - Verify frontend is running at `http://localhost:3000`
+
+#### Production Deployment
+1. **Data Processing**
+   - Run preprocessing script on the server
+   - Ensure cache directories are properly populated
+   - Verify file permissions for the web server
+
+2. **Backend Deployment**
+   - Build and deploy the FastAPI application
+   - Configure environment variables
+   - Set up proper logging and monitoring
+
+3. **Frontend Deployment**
+   - Build the React application:
+     ```bash
+     cd frontend
+     npm run build
+     ```
+   - Deploy the built files to the web server
+   - Configure reverse proxy settings
+
+Note: Always ensure data processing is complete and caches are properly generated before starting the backend service. The frontend depends on the backend being available and properly configured.
+
 ## Performance Considerations
 
 ### Frontend

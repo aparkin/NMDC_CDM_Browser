@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from abc import ABC
 import tiktoken
 from ..data_processing import StatisticsProcessor
+from src.data_processing.study_analysis_processor import StudyAnalysisProcessor
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -270,7 +271,7 @@ class LLMService:
                             stats_summary.append(f"- {item['label']}: {item['mean_abundance']:.2f} ± {item['std_abundance']:.2f}")
         
         # Base prompt
-        prompt = """You are an expert in environmental biology and ecology with specific interests in how environmental parameters impact the abundance and activities of organisms within their environments. Please analyze the following data and provide a comprehensive summary in the following sections:
+        prompt = """You are an expert in environmental biology and ecology with deep knowledge of microbial ecology, biogeochemistry, and systems biology. Please analyze the following data and provide a comprehensive summary in the following sections:
 
 1. General Scope of Studies:
 - Analyze the titles, descriptions, and timelines of the studies
@@ -363,6 +364,262 @@ Data for analysis:
             
         except Exception as e:
             logger.error(f"Error generating summary: {str(e)}")
+            raise
+
+    def _prepare_study_prompt(self, study_data: Dict, compendium_data: Dict) -> Tuple[str, int]:
+        """Prepare the prompt for study-specific summary generation."""
+        # Validate required data structures
+        if not study_data:
+            raise ValueError("Study data is empty")
+        if not compendium_data:
+            raise ValueError("Compendium data is empty")
+        
+        # Extract study information
+        study_id = study_data.get('id')
+        if not study_id:
+            raise ValueError("Study ID is missing from study data")
+        
+        study_name = study_data.get('name', 'Unnamed Study')
+        study_desc = study_data.get('description', 'No description available')
+        
+        # Extract analysis section
+        analysis = study_data.get('analysis', {})
+        if not analysis:
+            logger.warning("Analysis section is empty in study data")
+        
+        # Extract physical variables
+        physical_vars = analysis.get('physical', {})
+        if not physical_vars:
+            logger.warning("No physical variables found in analysis")
+        
+        # Extract omics data
+        omics_data = analysis.get('omics', {})
+        if not omics_data:
+            logger.warning("No omics data found in analysis")
+        
+        # Extract taxonomic data
+        taxonomic_data = analysis.get('taxonomic', {})
+        if not taxonomic_data:
+            logger.warning("No taxonomic data found in analysis")
+        
+        # Log data availability
+        logger.info(f"Data availability for study {study_id}:")
+        logger.info(f"- Physical variables: {len(physical_vars)}")
+        logger.info(f"- Omics data types: {list(omics_data.keys()) if omics_data else 'None'}")
+        logger.info(f"- Taxonomic data types: {list(taxonomic_data.keys()) if taxonomic_data else 'None'}")
+        
+        # Format physical variables section
+        physical_section = []
+        if physical_vars:
+            physical_section.append("\nPhysical Variables:")
+            for var, stats in physical_vars.items():
+                if var in compendium_data.get('physical_variable_stats', {}):
+                    comp_stats = compendium_data['physical_variable_stats'][var]
+                    physical_section.append(f"\n{var.replace('_', ' ').title()}:")
+                    physical_section.append(f"- Study mean: {stats.get('mean', 0):.2f}")
+                    physical_section.append(f"- Compendium mean: {comp_stats.get('mean', 0):.2f}")
+                    if abs(stats.get('mean', 0) - comp_stats.get('mean', 0)) > comp_stats.get('std', 0):
+                        physical_section.append("- Note: This value differs significantly from the compendium average")
+        
+        # Format omics section
+        omics_section = []
+        if omics_data:
+            omics_section.append("\nOmics Data:")
+            for omics_type, data in omics_data.items():
+                if omics_type in ['metabolomics', 'lipidomics', 'proteomics']:
+                    omics_section.append(f"\n{omics_type.title()}:")
+                    top10 = data.get('top10', [])
+                    if top10:
+                        omics_section.append("Most abundant features:")
+                        for item in top10[:5]:  # Show top 5
+                            omics_section.append(f"- {item.get('name', 'Unknown')}: {item.get('mean_abundance', 0):.2f}")
+        
+        # Format taxonomic section
+        taxonomic_section = []
+        if taxonomic_data:
+            taxonomic_section.append("\nTaxonomic Information:")
+            for tax_type, data in taxonomic_data.items():
+                if tax_type in ['contigs', 'centrifuge', 'kraken', 'gottcha']:
+                    taxonomic_section.append(f"\n{tax_type.title()} Analysis:")
+                    top10 = data.get('top10', [])
+                    if top10:
+                        taxonomic_section.append("Most abundant taxa:")
+                        for item in top10[:5]:  # Show top 5
+                            taxonomic_section.append(f"- {item.get('name', 'Unknown')}: {item.get('mean_abundance', 0):.2f}")
+        
+        # Set defaults before the conditional
+        study_ecosystem = 'Unknown'
+        study_sample_count = 0
+        ecosystem = study_ecosystem  # Always defined
+
+        # Overwrite if info is available
+        study_cards = compendium_data.get('study_cards', [])
+        study_info = next((card for card in study_cards if card.get('id') == study_id), None)
+        if study_info:
+            study_name = study_info.get('name', study_name)
+            study_desc = study_info.get('description', study_desc)
+            study_ecosystem = study_info.get('ecosystem', study_ecosystem)
+            study_sample_count = study_info.get('sample_count', study_sample_count)
+            ecosystem = study_ecosystem
+
+        # Extract analysis section
+        analysis = study_data.get('analysis', {})
+        # Ecosystem (prefer analysis['ecosystem'] if present)
+        ecosystem = analysis.get('ecosystem', ecosystem)
+
+        # Debug logging to check data
+        logger.info(f"Study name: {study_name}")
+        logger.info(f"Study description: {study_desc}")
+        logger.info(f"Ecosystem: {ecosystem}")
+        logger.info(f"Sample count: {study_sample_count}")
+        logger.info(f"Physical variables count: {len(physical_vars)}")
+        logger.info(f"Omics data types: {list(omics_data.keys()) if omics_data else 'None'}")
+        logger.info(f"Taxonomic data types: {list(taxonomic_data.keys()) if taxonomic_data else 'None'}")
+
+        # --- Prompt Construction ---
+        prompt = f"""You are an expert in environmental biology and ecology with deep knowledge of microbial ecology, biogeochemistry, and systems biology. Please analyze this study in the context of the broader compendium and provide a structured summary focusing on what makes this study unique and significant.\n\nStudy: {study_name}\nDescription: {study_desc}\nEcosystem: {ecosystem}\nSample Count: {study_sample_count}\n\nPlease provide a comprehensive analysis in the following sections:\n\nA. Purpose and Geography\n- Analyze the study's purpose and geographic context\n- Compare its location to other studies in the compendium\n- Highlight any unique geographic features\n- Consider the ecosystem type and its significance\n\nB. Physical Features and Environmental Context\n- Describe the characteristic physical variables of this study\n- Compare these to the compendium averages\n- Explain the significance of any notable differences\n- Discuss how these physical conditions might influence biological processes\n- Consider the implications of the sample count and measurement precision\n- Analyze potential environmental stressors or unique conditions\n\nC. Omics Data Analysis\n- For each omics type (metabolomics, lipidomics, proteomics):\n  * Analyze the most abundant features and their potential biological roles\n  * Explain the metabolic pathways and processes these features might be involved in\n  * Discuss how these features might interact with the physical environment\n  * Interpret the significance of outliers in terms of biological function\n  * Consider the implications for ecosystem function and microbial community dynamics\n\nD. Taxonomic Analysis and Ecological Implications\n- For each taxonomic rank (from superkingdom to species):\n  * Analyze the most abundant taxa and their ecological roles\n  * Explain their potential metabolic capabilities and functional traits\n  * Discuss their relationships with the physical environment\n  * Interpret the significance of outliers in terms of ecological function\n  * Consider how these taxa might interact with each other and their environment\n\nE. Integrated Analysis\n- Synthesize the relationships between physical variables, omics data, and taxonomic composition\n- Explain how the observed patterns might reflect ecosystem function\n- Discuss potential biogeochemical cycles and microbial processes\n- Analyze how the study's findings compare to similar ecosystems\n- Identify unique or unexpected patterns that might indicate novel processes\n\nPlease be specific about the data and their implications for biological processes or environmental conditions. Where data is limited or unavailable, note this limitation. Focus on what makes this study unique or significant compared to the broader compendium. Use your expertise in environmental biology and ecology to provide insights beyond the raw data.\n\nFor each significant feature (physical, omics, or taxonomic), please:\n1. Explain its potential biological or ecological role\n2. Describe how it might interact with other features\n3. Consider its implications for ecosystem function\n4. Discuss any known or potential adaptations to the observed conditions\n5. Analyze how it might respond to environmental changes\n\nData for analysis:\n\n{chr(10).join(physical_section)}\n{chr(10).join(omics_section)}\n{chr(10).join(taxonomic_section)}\n"""
+        
+        # Count tokens
+        token_count = self._count_tokens(prompt)
+        
+        return prompt, token_count
+
+    def generate_study_summary(self, study_id: str) -> Dict:
+        """Generate a study-specific summary using the LLM."""
+        try:
+            # Use StudyAnalysisProcessor to get analysis data
+            processor = StudyAnalysisProcessor()
+            study_data = processor.get_study_analysis(study_id)
+            logger.info(f"Successfully loaded study data with keys: {list(study_data.keys())}")
+
+            # Load compendium data
+            compendium_path = Path(__file__).parent.parent.parent / "study_summary.json"
+            logger.info(f"Loading compendium data from: {compendium_path}")
+            with open(compendium_path, "r") as f:
+                compendium_data = json.load(f)
+                logger.info(f"Successfully loaded compendium data with keys: {list(compendium_data.keys())}")
+
+            # Get study information from study_cards
+            study_cards = compendium_data.get('study_cards', [])
+            study_info = next((card for card in study_cards if card.get('id') == study_id), None)
+            if not study_info:
+                raise ValueError(f"Study {study_id} not found in compendium data")
+            
+            study_name = study_info.get('name', 'Unnamed Study')
+            study_desc = study_info.get('description', 'No description available')
+            study_ecosystem = study_info.get('ecosystem', 'Unknown')
+            study_sample_count = study_info.get('sample_count', 0)
+
+            # Extract analysis data
+            physical_vars = study_data.get('physical', {})
+            omics_data = study_data.get('omics', {})
+            taxonomic_data = study_data.get('taxonomic', {})
+            ecosystem = study_data.get('ecosystem', study_ecosystem)
+
+            # Debug logging to check data
+            logger.info(f"Study name: {study_name}")
+            logger.info(f"Study description: {study_desc}")
+            logger.info(f"Ecosystem: {ecosystem}")
+            logger.info(f"Sample count: {study_sample_count}")
+            logger.info(f"Physical variables count: {len(physical_vars)}")
+            logger.info(f"Omics data types: {list(omics_data.keys()) if omics_data else 'None'}")
+            logger.info(f"Taxonomic data types: {list(taxonomic_data.keys()) if taxonomic_data else 'None'}")
+
+            # --- Physical Variables ---
+            physical_section = []
+            if physical_vars:
+                physical_section.append("\nPhysical Variables:")
+                for var, stats in physical_vars.items():
+                    if stats.get('status') == 'ok':
+                        comp_stats = compendium_data.get('summary_stats', {}).get('physical_variable_stats', {}).get(var, {})
+                        physical_section.append(f"\n{var.replace('_', ' ').title()}:")
+                        physical_section.append(f"- Study mean: {stats.get('mean', 0)}")
+                        if comp_stats:
+                            physical_section.append(f"- Compendium mean: {comp_stats.get('mean', 0)}")
+                            if abs(stats.get('mean', 0) - comp_stats.get('mean', 0)) > comp_stats.get('std', 0):
+                                physical_section.append("- Note: This value differs significantly from the compendium average")
+                        physical_section.append(f"- Study range: {stats.get('min', 0)} to {stats.get('max', 0)}")
+                        physical_section.append(f"- Sample count: {stats.get('count', 0)}")
+
+            # --- Omics Data ---
+            omics_section = []
+            if omics_data:
+                omics_section.append("\nOmics Data:")
+                for omics_type in ['metabolomics', 'lipidomics', 'proteomics']:
+                    top10 = omics_data.get('top10', {}).get(omics_type, [])
+                    outliers = omics_data.get('outliers', {}).get(omics_type, [])
+                    if top10 or outliers:
+                        omics_section.append(f"\n{omics_type.title()}:")
+                        if top10:
+                            omics_section.append("Most abundant features in this study:")
+                            for item in top10[:5]:
+                                name = item.get('id', item.get('name', 'Unknown'))
+                                abundance = item.get('mean_abundance', 0)
+                                omics_section.append(f"- {name}: {abundance}")
+                        if outliers:
+                            omics_section.append("\nNotable outliers:")
+                            for item in outliers[:3]:
+                                name = item.get('id', item.get('name', 'Unknown'))
+                                abundance = item.get('mean_abundance', 0)
+                                omics_section.append(f"- {name}: {abundance}")
+
+            # --- Taxonomic Data ---
+            taxonomic_section = []
+            if taxonomic_data:
+                taxonomic_section.append("\nTaxonomic Information:")
+                for tax_type in ['gottcha', 'kraken', 'centrifuge', 'contigs']:
+                    top10_by_rank = taxonomic_data.get('top10', {}).get(tax_type, {})
+                    outliers_by_rank = taxonomic_data.get('outliers', {}).get(tax_type, {})
+                    for rank in ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']:
+                        top10 = top10_by_rank.get(rank, [])
+                        outliers = outliers_by_rank.get(rank, [])
+                        if top10 or outliers:
+                            taxonomic_section.append(f"\n{tax_type.title()} - {rank.title()}:")
+                            if top10:
+                                taxonomic_section.append("Most abundant taxa in this study:")
+                                for item in top10[:5]:
+                                    name = item.get('id', item.get('name', 'Unknown'))
+                                    abundance = item.get('mean_abundance', 0)
+                                    taxonomic_section.append(f"- {name}: {abundance}")
+                            if outliers:
+                                taxonomic_section.append("\nNotable outliers:")
+                                for item in outliers[:3]:
+                                    name = item.get('id', item.get('name', 'Unknown'))
+                                    abundance = item.get('mean_abundance', 0)
+                                    taxonomic_section.append(f"- {name}: {abundance}")
+
+            # --- Prompt Construction ---
+            prompt = f"""You are an expert in environmental biology and ecology with deep knowledge of microbial ecology, biogeochemistry, and systems biology. Please analyze this study in the context of the broader compendium and provide a structured summary focusing on what makes this study unique and significant.\n\nStudy: {study_name}\nDescription: {study_desc}\nEcosystem: {ecosystem}\nSample Count: {study_sample_count}\n\nPlease provide a comprehensive analysis in the following sections:\n\nA. Purpose and Geography\n- Analyze the study's purpose and geographic context\n- Compare its location to other studies in the compendium\n- Highlight any unique geographic features\n- Consider the ecosystem type and its significance\n\nB. Physical Features and Environmental Context\n- Describe the characteristic physical variables of this study\n- Compare these to the compendium averages\n- Explain the significance of any notable differences\n- Discuss how these physical conditions might influence biological processes\n- Consider the implications of the sample count and measurement precision\n- Analyze potential environmental stressors or unique conditions\n\nC. Omics Data Analysis\n- For each omics type (metabolomics, lipidomics, proteomics):\n  * Analyze the most abundant features and their potential biological roles\n  * Explain the metabolic pathways and processes these features might be involved in\n  * Discuss how these features might interact with the physical environment\n  * Interpret the significance of outliers in terms of biological function\n  * Consider the implications for ecosystem function and microbial community dynamics\n\nD. Taxonomic Analysis and Ecological Implications\n- For each taxonomic rank (from superkingdom to species):\n  * Analyze the most abundant taxa and their ecological roles\n  * Explain their potential metabolic capabilities and functional traits\n  * Discuss their relationships with the physical environment\n  * Interpret the significance of outliers in terms of ecological function\n  * Consider how these taxa might interact with each other and their environment\n\nE. Integrated Analysis\n- Synthesize the relationships between physical variables, omics data, and taxonomic composition\n- Explain how the observed patterns might reflect ecosystem function\n- Discuss potential biogeochemical cycles and microbial processes\n- Analyze how the study's findings compare to similar ecosystems\n- Identify unique or unexpected patterns that might indicate novel processes\n\nPlease be specific about the data and their implications for biological processes or environmental conditions. Where data is limited or unavailable, note this limitation. Focus on what makes this study unique or significant compared to the broader compendium. Use your expertise in environmental biology and ecology to provide insights beyond the raw data.\n\nFor each significant feature (physical, omics, or taxonomic), please:\n1. Explain its potential biological or ecological role\n2. Describe how it might interact with other features\n3. Consider its implications for ecosystem function\n4. Discuss any known or potential adaptations to the observed conditions\n5. Analyze how it might respond to environmental changes\n\nData for analysis:\n\n{chr(10).join(physical_section)}\n{chr(10).join(omics_section)}\n{chr(10).join(taxonomic_section)}\n"""
+            
+            # Count tokens
+            token_count = self._count_tokens(prompt)
+
+            # Call LLM
+            response = self._client.chat.completions.create(
+                model=self.config.model_name,
+                messages=[
+                    {"role": "system", "content": "You are an expert in environmental biology and ecology."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens
+            )
+
+            # Process response
+            summary = response.choices[0].message.content
+
+            # Structure the response
+            result = {
+                "summary": summary,
+                "last_updated": datetime.now().isoformat(),
+                "study_id": study_id,
+                "token_count": token_count
+            }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error generating study summary: {str(e)}")
             raise
 
 # Initialize the service

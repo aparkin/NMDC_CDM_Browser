@@ -19,21 +19,51 @@ A web application for browsing and analyzing data from the National Microbiome D
 ```
 .
 ├── data/                  # Raw data files
+│   ├── sample_table_snappy.parquet
+│   ├── study_table_snappy.parquet
+│   ├── contigs_rollup_table_snappy.parquet
+│   ├── centrifuge_rollup_table_snappy.parquet
+│   ├── kraken_rollup_table_snappy.parquet
+│   ├── gottcha_rollup_table_snappy.parquet
+│   ├── metabolites_table_snappy.parquet
+│   ├── lipidomics_table_snappy.parquet
+│   └── proteomics_table_snappy.parquet
 ├── frontend/             # React frontend application
-├── processed_data/       # Processed data files
-├── src/                  # Backend code
-│   ├── api/             # API endpoints
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── hooks/      # Custom React hooks
+│   │   ├── types/      # TypeScript type definitions
+│   │   └── utils/      # Frontend utilities
+│   ├── public/         # Static assets
+│   └── package.json    # Frontend dependencies
+├── processed_data/      # Processed data files
+│   ├── study_analysis_cache/  # Individual study analysis results
+│   │   ├── study_id_1.json   # Analysis results for study 1
+│   │   ├── study_id_2.json   # Analysis results for study 2
+│   │   └── ...              # Additional study results
+│   └── study_summary.json    # Overall study summary data
+├── src/                 # Backend code
+│   ├── api/            # API endpoints
+│   │   ├── routes/     # API route definitions
+│   │   └── main.py     # FastAPI application
 │   ├── data_processing/ # Data processing modules
-│   └── utils/           # Utility functions
-└── docs/                # Documentation
-    ├── api.md          # API documentation
-    └── architecture.md # System architecture
+│   │   ├── processors/ # Data processors
+│   │   └── utils/      # Processing utilities
+│   └── utils/          # General utilities
+├── docs/               # Documentation
+│   ├── api.md         # API documentation
+│   ├── architecture.md # System architecture
+│   └── deployment.md  # Deployment documentation
+├── Dockerfile.frontend # Frontend Docker configuration
+├── Dockerfile.backend  # Backend Docker configuration
+└── docker-compose.yml  # Docker Compose configuration
 ```
 
 ## Documentation
 
 - [API Documentation](docs/api.md)
 - [System Architecture](docs/architecture.md)
+- [Deployment Guide](docs/deployment.md)
 
 ## Dependencies
 
@@ -79,7 +109,9 @@ A web application for browsing and analyzing data from the National Microbiome D
 
 ## Setup
 
-### Backend Setup
+### Development Setup
+
+#### Backend Setup
 
 1. Create a virtual environment:
    ```bash
@@ -92,12 +124,17 @@ A web application for browsing and analyzing data from the National Microbiome D
    pip install -r requirements.txt
    ```
 
-3. Start the backend server:
+3. Process initial data:
+   ```bash
+   python src/data_processing/process_data.py
+   ```
+
+4. Start the backend server:
    ```bash
    uvicorn src.api.main:app --reload
    ```
 
-### Frontend Setup
+#### Frontend Setup
 
 1. Navigate to the frontend directory:
    ```bash
@@ -114,18 +151,73 @@ A web application for browsing and analyzing data from the National Microbiome D
    npm run dev
    ```
 
-## Usage
+### Docker Deployment
 
-1. Access the application at `http://localhost:5173`
-2. Use the map interface to explore study locations
-3. Click on markers to view study details
-4. Use the statistics view to analyze omics data
-5. Filter and search studies using the study list
-6. View the AI-generated summary for a comprehensive analysis of the compendium
+1. Build and start the containers:
+   ```bash
+   docker-compose up --build
+   ```
 
-## API Endpoints
+2. Access the application:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
 
-See [API Documentation](docs/api.md) for detailed endpoint information.
+## Cache Management
+
+The application uses caching to improve performance. Cache files are stored in:
+- `processed_data/study_analysis_cache/`: Individual study analysis results
+- `processed_data/study_summary.json`: Overall study summary data
+
+### Clearing Cache
+
+When making changes to data processing logic (e.g., species count calculations), clear the cache:
+
+```bash
+rm -rf processed_data/study_analysis_cache/* processed_data/study_summary.json
+python src/data_processing/process_data.py
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Data Files**
+   Required data files in `data/`:
+   - `sample_table_snappy.parquet`: Sample metadata
+   - `study_table_snappy.parquet`: Study metadata
+   - `contigs_rollup_table_snappy.parquet`: Contigs analysis data
+   - `centrifuge_rollup_table_snappy.parquet`: Centrifuge analysis data
+   - `kraken_rollup_table_snappy.parquet`: Kraken analysis data
+   - `gottcha_rollup_table_snappy.parquet`: GOTTCHA analysis data
+   - `metabolites_table_snappy.parquet`: Metabolomics data
+   - `lipidomics_table_snappy.parquet`: Lipidomics data
+   - `proteomics_table_snappy.parquet`: Proteomics data
+
+   If any of these files are missing:
+   - Ensure all data files are present in the `data/` directory
+   - Run `python src/data_processing/process_data.py` to generate required processed data
+
+2. **Cache Issues**
+   - Clear cache files if data appears incorrect:
+     ```bash
+     rm -rf processed_data/study_analysis_cache/* processed_data/study_summary.json
+     ```
+   - Regenerate cache using the process_data.py script:
+     ```bash
+     python src/data_processing/process_data.py
+     ```
+   - Verify cache structure:
+     - `processed_data/study_analysis_cache/` should contain JSON files for each study
+     - `processed_data/study_summary.json` should contain overall statistics
+
+3. **Docker Issues**
+   - Ensure ports 3000 and 8000 are available
+   - Check Docker logs: `docker-compose logs`
+
+4. **Frontend Build Issues**
+   - Clear node_modules: `rm -rf frontend/node_modules`
+   - Reinstall dependencies: `npm install`
 
 ## Contributing
 

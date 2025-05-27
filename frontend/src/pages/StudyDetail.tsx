@@ -10,7 +10,7 @@ import {
 import { MapContainer } from '@/components/MapContainer';
 import { SampleRibbon } from '@/components/SampleRibbon';
 import { ResizableContainer } from '@/components/ResizableContainer';
-import AISummary from '../components/AISummary';
+import StudyAISummary from '../components/StudyAISummary';
 import StudyStatisticsView from '../components/StudyStatisticsView';
 
 interface Study {
@@ -85,9 +85,25 @@ const StudyDetail: React.FC = () => {
 
         // Group samples by location
         const locationMap = new Map<string, any>();
+        const sampleDataMap = new Map<string, any>(); // Track sample data by ID
+
         samplesData.forEach((sample: any) => {
           if (sample.latitude && sample.longitude) {
             const key = `${sample.latitude},${sample.longitude}`;
+            
+            // Merge data for samples with the same ID
+            if (sampleDataMap.has(sample.id)) {
+              const existingData = sampleDataMap.get(sample.id);
+              // Merge the data, keeping non-null values
+              Object.keys(sample).forEach(k => {
+                if (sample[k] != null && (existingData[k] == null || existingData[k] === '')) {
+                  existingData[k] = sample[k];
+                }
+              });
+            } else {
+              sampleDataMap.set(sample.id, { ...sample });
+            }
+
             if (!locationMap.has(key)) {
               locationMap.set(key, {
                 latitude: sample.latitude,
@@ -97,8 +113,12 @@ const StudyDetail: React.FC = () => {
               });
             }
             const location = locationMap.get(key);
-            location.sample_count++;
-            location.samples.push(sample);
+            
+            // Only add the sample if it's not already in this location
+            if (!location.samples.some((s: any) => s.id === sample.id)) {
+              location.sample_count++;
+              location.samples.push(sampleDataMap.get(sample.id));
+            }
           }
         });
 
@@ -196,7 +216,7 @@ const StudyDetail: React.FC = () => {
         minHeight={200}
         maxHeight={600}
       >
-        <AISummary />
+        <StudyAISummary studyId={studyId!} />
       </ResizableContainer>
 
       {/* Sample Ribbon */}

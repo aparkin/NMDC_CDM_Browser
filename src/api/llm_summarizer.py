@@ -6,7 +6,7 @@ import os
 from typing import Dict, List, Optional, Tuple
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import openai
 from dotenv import load_dotenv
 from dataclasses import dataclass
@@ -25,17 +25,28 @@ load_dotenv(dotenv_path=dotenv_path)
 
 # OpenAI Settings
 CBORG = os.getenv('USE_CBORG', 'false').lower() == 'true'
+logger.info(f"Environment variables:")
+logger.info(f"  USE_CBORG: {os.getenv('USE_CBORG')}")
+logger.info(f"  CBORG_BASE_URL: {os.getenv('CBORG_BASE_URL')}")
+logger.info(f"  CBORG_API_KEY: {'Set' if os.getenv('CBORG_API_KEY') else 'Not set'}")
+logger.info(f"  CBORG_GENERATION_MODEL: {os.getenv('CBORG_GENERATION_MODEL')}")
+logger.info(f"  OPENAI_BASE_URL: {os.getenv('OPENAI_BASE_URL')}")
+logger.info(f"  OPENAI_API_KEY: {'Set' if os.getenv('OPENAI_API_KEY') else 'Not set'}")
+logger.info(f"  OPENAI_GENERATION_MODEL: {os.getenv('OPENAI_GENERATION_MODEL')}")
+
 OPENAI_BASE_URL = os.getenv('CBORG_BASE_URL' if CBORG else 'OPENAI_BASE_URL', 
                            "https://api.cborg.lbl.gov" if CBORG else "https://api.openai.com/v1")
 OPENAI_API_KEY = os.getenv('CBORG_API_KEY' if CBORG else 'OPENAI_API_KEY', '')
+GENERATION_MODEL = os.getenv('CBORG_GENERATION_MODEL' if CBORG else 'OPENAI_GENERATION_MODEL',
+                           "gpt-4-turbo-preview" if not CBORG else "gpt-4")
 
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable must be set")
+    raise ValueError("API key environment variable must be set")
 
 @dataclass
 class LLMConfig:
     """Configuration for LLM service."""
-    model_name: str = "gpt-4-turbo-preview"  # Default to GPT-4
+    model_name: str = GENERATION_MODEL  # Use environment-specific model
     temperature: float = 0.4
     max_tokens: int = 4000  # Maximum tokens for response
     context_window: int = 128000  # GPT-4 Turbo context window
@@ -50,7 +61,11 @@ class LLMService:
             api_key=OPENAI_API_KEY,
             base_url=OPENAI_BASE_URL
         )
-        self._encoding = tiktoken.encoding_for_model(self.config.model_name)
+        # Use cl100k_base encoding for Claude models
+        if "claude" in self.config.model_name.lower():
+            self._encoding = tiktoken.get_encoding("cl100k_base")
+        else:
+            self._encoding = tiktoken.encoding_for_model(self.config.model_name)
         
     def _count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text string."""
@@ -113,7 +128,7 @@ class LLMService:
 
             # Add taxonomic statistics
             taxonomic_stats = {}
-            for analysis_type in ['gottcha', 'metaphlan']:
+            for analysis_type in ['gottcha', 'kraken', 'centrifuge', 'contigs']:
                 try:
                     stats = stats_processor.get_taxonomic_statistics(analysis_type)
                     if stats:
@@ -326,6 +341,24 @@ Data for analysis:
     def generate_summary(self) -> Dict:
         """Generate a comprehensive summary using the LLM."""
         try:
+            # Check cache first
+            cache_path = project_root / "processed_data" / "ai_summary.json"
+            summary_path = project_root / "study_summary.json"
+            
+            if cache_path.exists() and summary_path.exists():
+                try:
+                    # Check if source data has been modified
+                    cache_mtime = cache_path.stat().st_mtime
+                    summary_mtime = summary_path.stat().st_mtime
+                    
+                    if cache_mtime > summary_mtime:
+                        with open(cache_path, "r") as f:
+                            cached_data = json.load(f)
+                            logger.info("Using cached summary")
+                            return cached_data
+                except Exception as e:
+                    logger.warning(f"Error checking cache: {str(e)}")
+            
             # Load data
             data = self._load_data()
             
@@ -356,9 +389,13 @@ Data for analysis:
             }
             
             # Cache the result
-            cache_path = project_root / "processed_data" / "ai_summary.json"
-            with open(cache_path, "w") as f:
-                json.dump(result, f, indent=2)
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(cache_path, "w") as f:
+                    json.dump(result, f, indent=2)
+                logger.info("Cached summary updated")
+            except Exception as e:
+                logger.error(f"Error caching summary: {str(e)}")
             
             return result
             

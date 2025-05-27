@@ -183,8 +183,35 @@ class StudyAnalysisProcessor(StatisticsProcessor):
             if len(study_samples) == 0:
                 raise ValueError(f"No samples found for study {study_id}")
             
+            # Get study metadata from study table
+            study_df = pd.read_parquet(self.data_dir / "study_table_snappy.parquet")
+            study_info = study_df[study_df['id'] == study_id]
+            
+            # Also load study card data for additional metadata
+            project_root = Path(__file__).parent.parent.parent
+            summary_path = project_root / "processed_data" / "study_summary.json"
+            with open(summary_path, "r") as f:
+                summary_data = json.load(f)
+                study_cards = summary_data.get('study_cards', [])
+                study_card = next((card for card in study_cards if card.get('id') == study_id), None)
+            
+            if len(study_info) == 0:
+                logger.warning(f"No study metadata found for study {study_id}")
+                study_info = None
+            else:
+                study_info = study_info.iloc[0]
+                logger.info(f"Found study metadata for {study_id}:")
+                logger.info(f"  Name: {study_info.get('name')}")
+                logger.info(f"  Description: {study_info.get('description')}")
+                logger.info(f"  Ecosystem: {study_info.get('ecosystem')}")
+            
             # Process all components
             analysis = {
+                'id': study_id,
+                'name': (study_info.get('name') if study_info is not None else None) or (study_card.get('name') if study_card is not None else None) or 'Unnamed Study',
+                'description': (study_info.get('description') if study_info is not None else None) or (study_card.get('description') if study_card is not None else None) or 'No description available',
+                'ecosystem': (study_info.get('ecosystem') if study_info is not None else None) or (study_card.get('ecosystem') if study_card is not None else None) or 'Unknown',
+                'sample_count': len(study_samples),
                 'physical': self._process_physical_variables(study_id, study_samples),
                 'omics': {
                     'top10': self._process_omics_top10(study_id, study_samples),
@@ -199,8 +226,21 @@ class StudyAnalysisProcessor(StatisticsProcessor):
                 'map_data': self._process_map_data(study_id, study_samples)
             }
             
-            # Log summary of map data
-            logger.info(f"Map data for study {study_id}: {len(analysis['map_data']['locations'])} locations")
+            # Add any additional metadata from study card
+            if study_card:
+                for key, value in study_card.items():
+                    if key not in analysis and key not in ['id', 'name', 'description', 'ecosystem', 'sample_count']:
+                        analysis[key] = value
+            
+            # Log summary of analysis data
+            logger.info(f"Analysis summary for study {study_id}:")
+            logger.info(f"  Name: {analysis['name']}")
+            logger.info(f"  Description: {analysis['description']}")
+            logger.info(f"  Sample count: {analysis['sample_count']}")
+            logger.info(f"  Physical variables: {list(analysis['physical'].keys())}")
+            logger.info(f"  Omics data: {list(analysis['omics'].keys())}")
+            logger.info(f"  Taxonomic data: {list(analysis['taxonomic'].keys())}")
+            logger.info(f"  Map locations: {len(analysis['map_data']['locations'])}")
             
             # Cache the results in memory and on disk
             self.cache[study_id] = analysis

@@ -9,6 +9,7 @@ from . import llm_summarizer
 from .study_analysis import router as study_analysis_router
 from .routers import studies
 from ..data_processing.study_analysis_processor import StudyAnalysisProcessor
+from src.api.study_detail_summarizer import StudyDetailSummarizer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -86,6 +87,10 @@ def load_summary_data() -> Dict:
             "measurement_coverage": {},
             "study_cards": []
         }
+
+# Initialize processors
+processor = StudyAnalysisProcessor()
+summarizer = StudyDetailSummarizer()
 
 @app.get("/")
 async def root():
@@ -245,6 +250,29 @@ async def test_physical_variable(study_id: str, variable: str):
             return {"error": f"Variable {variable} not found in study {study_id}"}
     except Exception as e:
         logger.error(f"Error processing variable {variable} for study {study_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/studies/{study_id}/summary/ai")
+async def get_study_ai_summary(study_id: str, force: bool = False):
+    """
+    Get AI-generated summary for a specific study.
+    
+    Args:
+        study_id (str): The unique identifier of the study
+        force (bool): If true, forces regeneration of the summary
+        
+    Returns:
+        Dict: AI-generated summary with sections and metadata
+        
+    Raises:
+        HTTPException: If study is not found or summary generation fails
+    """
+    try:
+        logger.info(f"Generating AI summary for study {study_id} (force={force})")
+        summary = summarizer.generate_summary(study_id, force=force)
+        return summary
+    except Exception as e:
+        logger.error(f"Error generating AI summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

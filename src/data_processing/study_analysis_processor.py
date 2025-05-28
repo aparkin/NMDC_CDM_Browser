@@ -914,12 +914,34 @@ class StudyAnalysisProcessor(StatisticsProcessor):
             sample_counts: Dict[str, Dict[str, int]] = {}
             for col in ['ecosystem', 'ecosystem_category', 'ecosystem_type', 'ecosystem_subtype', 'specific_ecosystem']:
                 if col in study_samples.columns:
-                    sample_counts[col] = {str(k): int(v) for k, v in study_samples[col].value_counts().to_dict().items()}
+                    # Calculate frequencies directly from the study samples
+                    value_counts = study_samples[col].value_counts()
+                    sample_counts[col] = {str(k): int(v) for k, v in value_counts.to_dict().items()}
+            
+            # Get ecosystem statistics for each variable
+            ecosystem_stats = {}
+            valid_variables = [
+                'ecosystem', 'ecosystem_category', 'ecosystem_subtype',
+                'ecosystem_type', 'env_broad_scale_label', 'env_local_scale_label',
+                'specific_ecosystem', 'env_medium_label', 'soil_horizon', 'soil_type'
+            ]
+            
+            for variable in valid_variables:
+                if variable in study_samples.columns:
+                    # Handle null values by replacing them with "Unknown"
+                    value_counts = study_samples[variable].fillna("Unknown").value_counts().to_dict()
+                    ecosystem_stats[variable] = {
+                        'variable': variable,
+                        'value_counts': value_counts,
+                        'total_samples': len(study_samples),
+                        'unique_values': len(value_counts)
+                    }
             
             return {
                 'ecosystem_data': ecosystem_data,
                 'most_common': most_common,
-                'sample_counts': sample_counts
+                'sample_counts': sample_counts,
+                'statistics': ecosystem_stats
             }
             
         except Exception as e:

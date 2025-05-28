@@ -97,6 +97,25 @@ class StatisticsProcessor:
     def get_ecosystem_statistics(self, variable: str) -> Dict:
         """Get statistics for a specific ecosystem variable"""
         logger.info(f"Processing ecosystem statistics for {variable}")
+        
+        # First try to get from study analysis cache
+        study_cache_dir = Path("processed_data/study_analysis_cache")
+        if study_cache_dir.exists():
+            # Get all study cache files
+            cache_files = list(study_cache_dir.glob("*.json"))
+            if cache_files:
+                # Use the first study's cache as a reference
+                with open(cache_files[0], 'r') as f:
+                    study_data = json.load(f)
+                    analysis_data = study_data.get('analysis', {})
+                    ecosystem_data = analysis_data.get('ecosystem', {})
+                    if ecosystem_data and 'statistics' in ecosystem_data:
+                        stats = ecosystem_data['statistics'].get(variable)
+                        if stats:
+                            logger.info(f"Using cached ecosystem statistics for {variable}")
+                            return stats
+        
+        # If not found in cache, calculate from sample data
         samples_df = self._load_parquet("sample_table_snappy.parquet")
         
         valid_variables = [
@@ -129,9 +148,6 @@ class StatisticsProcessor:
         # Handle null values by replacing them with "Unknown"
         value_counts = samples_df[variable].fillna("Unknown").value_counts().to_dict()
         total_samples = len(samples_df)
-        
-        # Log the value counts at debug level
-        logger.debug(f"Value counts for {variable}: {value_counts}")
         
         return {
             'variable': variable,

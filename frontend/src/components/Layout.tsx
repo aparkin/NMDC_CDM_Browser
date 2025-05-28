@@ -42,6 +42,11 @@ const Layout = ({ children }: LayoutProps) => {
     setOpen(!open);
   };
 
+  // Extract studyId and sampleId from the current path
+  const pathParts = location.pathname.split('/');
+  const studyId = pathParts[2]; // /studies/:studyId
+  const sampleId = pathParts[4]; // /studies/:studyId/samples/:sampleId
+
   const menuItems = [
     {
       text: 'Studies',
@@ -51,14 +56,14 @@ const Layout = ({ children }: LayoutProps) => {
         {
           text: 'Study Dashboard',
           icon: <CategoryIcon />,
-          path: '/studies/:studyId',
-          hidden: true // This will be shown when a study is selected
+          path: `/studies/${studyId}`,
+          hidden: !studyId // Only hide if we're not in a study context
         },
         {
-          text: 'Samples',
+          text: 'Sample Detail',
           icon: <BiotechIcon />,
-          path: '/studies/:studyId/samples',
-          hidden: true // This will be shown when a study is selected
+          path: `/studies/${studyId}/samples/${sampleId}`,
+          hidden: !sampleId // Only show when viewing a sample
         }
       ]
     },
@@ -104,18 +109,15 @@ const Layout = ({ children }: LayoutProps) => {
           </ListItemButton>
         </ListItem>
         {item.children && open && item.children.map((child) => {
-          // Only show child items if they're not hidden or if we're in the correct context
-          const shouldShow = !child.hidden || 
-            (child.path.includes(':studyId') && location.pathname.includes('/studies/'));
-          
-          if (!shouldShow) return null;
+          // Only show child items if they're not hidden
+          if (child.hidden) return null;
 
           return (
             <ListItem key={child.text} disablePadding>
               <ListItemButton
                 component={Link}
-                to={child.path.replace(':studyId', location.pathname.split('/')[2] || '')}
-                selected={location.pathname === child.path.replace(':studyId', location.pathname.split('/')[2] || '')}
+                to={child.path}
+                selected={location.pathname === child.path}
                 sx={{
                   minHeight: 48,
                   justifyContent: open ? 'initial' : 'center',

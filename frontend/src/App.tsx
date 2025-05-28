@@ -5,6 +5,7 @@ import StudyList from './components/StudyList';
 import Layout from './components/Layout';
 import StudySetSummary from './pages/StudySetSummary';
 import StudyDetail from './pages/StudyDetail';
+import SampleDetail from './pages/SampleDetail';
 
 // Create a theme instance
 const theme = createTheme({
@@ -39,6 +40,7 @@ function App() {
             <Routes>
               <Route path="/" element={<StudyList />} />
               <Route path="/studies/:studyId" element={<StudyDetail />} />
+              <Route path="/studies/:studyId/samples/:sampleId" element={<SampleDetail />} />
               <Route path="/set" element={<StudySetSummary />} />
             </Routes>
           </Layout>

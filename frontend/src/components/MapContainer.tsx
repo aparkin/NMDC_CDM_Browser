@@ -19,6 +19,8 @@ L.Icon.Default.mergeOptions({
 declare module 'leaflet' {
   interface CircleMarkerOptions {
     sampleCount?: number;
+    sampleId?: string;
+    locationKey?: string;
   }
 }
 
@@ -51,6 +53,7 @@ interface MapContainerProps {
   locations: Location[];
   center?: [number, number];
   initialZoom?: number;
+  highlightSampleId?: string;
 }
 
 // Generate consistent colors based on ecosystem type
@@ -79,7 +82,8 @@ const getEcosystemColor = (ecosystemType: string | null | undefined) => {
 export const MapContainer: React.FC<MapContainerProps> = ({ 
   locations, 
   center,
-  initialZoom = 2 
+  initialZoom = 2,
+  highlightSampleId
 }) => {
   const defaultCenter: [number, number] = center || [0, 0];
   const mapRef = useRef<L.Map | null>(null);
@@ -101,25 +105,35 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       zoomToBoundsOnClick: true,
       disableClusteringAtZoom: 15,
       spiderLegPolylineOptions: { weight: 1.5, color: '#1976d2', opacity: 0.5 },
-      // Custom cluster icon with dynamic size
+      // Custom cluster icon with dynamic size and highlighting
       iconCreateFunction: (cluster: L.MarkerCluster) => {
         const markers = cluster.getAllChildMarkers();
         const totalSamples = markers.reduce((sum, marker) => {
           if (marker instanceof L.CircleMarker) {
-            return sum + (marker.options.sampleCount || 0);
+            return sum + (marker.options.sampleCount || 1);
           }
           return sum;
         }, 0);
+        
+        // Check if this cluster contains the target sample
+        const containsTargetSample = markers.some(marker => {
+          if (!(marker instanceof L.CircleMarker)) return false;
+          const markerLocation = locations.find(loc => 
+            loc.latitude === marker.getLatLng().lat && 
+            loc.longitude === marker.getLatLng().lng
+          );
+          return markerLocation?.samples?.some(sample => sample.id === highlightSampleId);
+        });
         
         // Calculate size based on sample count
         const size = Math.min(60, Math.max(40, 30 + Math.log2(totalSamples) * 5));
         
         return L.divIcon({
-          html: `<div style="background-color: #1976d2; color: white; border-radius: 50%; width: ${size}px; height: ${size}px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+          html: `<div style="background-color: ${containsTargetSample ? '#ff4444' : '#1976d2'}; color: white; border-radius: 50%; width: ${size}px; height: ${size}px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
             <span style="font-weight: bold; font-size: ${Math.min(16, Math.max(12, 12 + Math.log2(totalSamples)))}px;">${totalSamples}</span>
             <small style="font-size: ${Math.min(10, Math.max(8, 8 + Math.log2(totalSamples)))}px;">samples</small>
           </div>`,
-          className: 'marker-cluster',
+          className: containsTargetSample ? 'marker-cluster target-cluster' : 'marker-cluster',
           iconSize: L.point(size, size)
         });
       }
@@ -127,62 +141,97 @@ export const MapContainer: React.FC<MapContainerProps> = ({
 
     // Add markers to cluster
     locations.forEach((location) => {
-      const marker = L.circleMarker([location.latitude, location.longitude], {
-        radius: 6,
-        fillColor: getEcosystemColor(location.ecosystem_type),
-        color: '#fff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8,
-        sampleCount: location.sample_count
+      // Create a marker for each sample at this location
+      location.samples?.forEach(sample => {
+        const isTargetSample = sample.id === highlightSampleId;
+        const marker = L.circleMarker([location.latitude, location.longitude], {
+          radius: isTargetSample ? 10 : 6,
+          fillColor: isTargetSample ? '#ff0000' : getEcosystemColor(location.ecosystem_type),
+          color: '#fff',
+          weight: isTargetSample ? 3 : 2,
+          opacity: 1,
+          fillOpacity: 0.8,
+          sampleCount: 1, // Each marker represents one sample
+          sampleId: sample.id // Store the sample ID
+        });
+
+        // Create popup content for this specific sample
+        const popupContent = `
+          <div style="min-width: 200px; padding: 8px;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">
+              ${sample.sample_name || 'Unnamed Sample'}
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              <div><strong>ID:</strong> ${sample.id || 'Unknown'}</div>
+              <div><strong>Collection Date:</strong> ${sample.collection_date || 'N/A'}</div>
+              <div><strong>Coordinates:</strong> ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}</div>
+              <div><strong>Ecosystem:</strong> ${sample.ecosystem || 'N/A'}</div>
+              <div><strong>Ecosystem Category:</strong> ${sample.ecosystem_category || 'N/A'}</div>
+              <div><strong>Ecosystem Subtype:</strong> ${sample.ecosystem_subtype || 'N/A'}</div>
+              <div><strong>Ecosystem Type:</strong> ${sample.ecosystem_type || 'N/A'}</div>
+              <div><strong>Specific Ecosystem:</strong> ${sample.specific_ecosystem || 'N/A'}</div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+
+        // Add hover tooltip
+        marker.bindTooltip(sample.sample_name || 'Unnamed Sample', {
+          permanent: false,
+          direction: 'top',
+          className: 'custom-tooltip'
+        });
+
+        // Add a unique key to the marker for React
+        (marker as any).key = `${location.latitude},${location.longitude}-${sample.id}`;
+
+        markerCluster.addLayer(marker);
       });
 
-      // Create popup content with sample information
-      const popupContent = location.samples ? location.samples.map(sample => `
-        <div style="min-width: 200px; padding: 8px; border-bottom: 1px solid #eee;">
-          <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">
-            ${sample.sample_name || 'Unnamed Sample'}
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <div><strong>ID:</strong> ${sample.id || 'Unknown'}</div>
-            <div><strong>Collection Date:</strong> ${sample.collection_date || 'N/A'}</div>
-            <div><strong>Coordinates:</strong> ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}</div>
-            <div><strong>Ecosystem:</strong> ${sample.ecosystem || 'N/A'}</div>
-            <div><strong>Ecosystem Category:</strong> ${sample.ecosystem_category || 'N/A'}</div>
-            <div><strong>Ecosystem Subtype:</strong> ${sample.ecosystem_subtype || 'N/A'}</div>
-            <div><strong>Ecosystem Type:</strong> ${sample.ecosystem_type || 'N/A'}</div>
-            <div><strong>Specific Ecosystem:</strong> ${sample.specific_ecosystem || 'N/A'}</div>
-          </div>
-        </div>
-      `).join('') : `
-        <div style="min-width: 200px; padding: 8px;">
-          <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">
-            Location
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <div><strong>Coordinates:</strong> ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}</div>
-            <div><strong>Samples:</strong> ${location.sample_count}</div>
-            ${location.ecosystem ? `<div><strong>Ecosystem:</strong> ${location.ecosystem}</div>` : ''}
-            ${location.ecosystem_type ? `<div><strong>Type:</strong> ${location.ecosystem_type}</div>` : ''}
-            ${location.ecosystem_subtype ? `<div><strong>Subtype:</strong> ${location.ecosystem_subtype}</div>` : ''}
-            ${location.specific_ecosystem ? `<div><strong>Specific:</strong> ${location.specific_ecosystem}</div>` : ''}
-          </div>
-        </div>
-      `;
+      // If there are no samples at this location, create a single marker
+      if (!location.samples?.length) {
+        const marker = L.circleMarker([location.latitude, location.longitude], {
+          radius: 6,
+          fillColor: getEcosystemColor(location.ecosystem_type),
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8,
+          sampleCount: location.sample_count
+        });
 
-      marker.bindPopup(popupContent);
+        // Create popup content for the location
+        const popupContent = `
+          <div style="min-width: 200px; padding: 8px;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">
+              Location
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              <div><strong>Coordinates:</strong> ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}</div>
+              <div><strong>Samples:</strong> ${location.sample_count}</div>
+              ${location.ecosystem ? `<div><strong>Ecosystem:</strong> ${location.ecosystem}</div>` : ''}
+              ${location.ecosystem_type ? `<div><strong>Type:</strong> ${location.ecosystem_type}</div>` : ''}
+              ${location.ecosystem_subtype ? `<div><strong>Subtype:</strong> ${location.ecosystem_subtype}</div>` : ''}
+              ${location.specific_ecosystem ? `<div><strong>Specific:</strong> ${location.specific_ecosystem}</div>` : ''}
+            </div>
+          </div>
+        `;
 
-      // Add hover tooltip
-      const tooltipContent = location.samples ? 
-        `${location.samples[0].sample_name || 'Unnamed Sample'}${location.samples.length > 1 ? ` (+${location.samples.length - 1} more)` : ''}` :
-        `${location.sample_count} samples`;
-      marker.bindTooltip(tooltipContent, {
-        permanent: false,
-        direction: 'top',
-        className: 'custom-tooltip'
-      });
+        marker.bindPopup(popupContent);
 
-      markerCluster.addLayer(marker);
+        // Add hover tooltip
+        marker.bindTooltip(`${location.sample_count} samples`, {
+          permanent: false,
+          direction: 'top',
+          className: 'custom-tooltip'
+        });
+
+        // Add a unique key to the marker for React
+        (marker as any).key = `${location.latitude},${location.longitude}-location`;
+
+        markerCluster.addLayer(marker);
+      }
     });
 
     // Add cluster group to map
@@ -196,7 +245,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       mapRef.current.fitBounds(bounds);
     }
 
-    // Add custom CSS for tooltips and popups
+    // Add custom CSS for tooltips, popups, and cluster animations
     const style = document.createElement('style');
     style.textContent = `
       .custom-tooltip {
@@ -235,23 +284,20 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       .marker-cluster div {
         background-color: #1976d2 !important;
       }
-      .marker-cluster-small {
-        background-color: rgba(25, 118, 210, 0.6) !important;
+      .target-cluster div {
+        background-color: #ff4444 !important;
+        animation: pulse 2s infinite;
       }
-      .marker-cluster-small div {
-        background-color: #1976d2 !important;
-      }
-      .marker-cluster-medium {
-        background-color: rgba(25, 118, 210, 0.6) !important;
-      }
-      .marker-cluster-medium div {
-        background-color: #1976d2 !important;
-      }
-      .marker-cluster-large {
-        background-color: rgba(25, 118, 210, 0.6) !important;
-      }
-      .marker-cluster-large div {
-        background-color: #1976d2 !important;
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
+        }
       }
     `;
     document.head.appendChild(style);
@@ -264,7 +310,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       }
       document.head.removeChild(style);
     };
-  }, [locations]);
+  }, [locations, highlightSampleId]);
 
   return (
     <Box sx={{ height: '100%', width: '100%' }}>

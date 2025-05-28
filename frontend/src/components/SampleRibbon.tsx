@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
 import { MapContainer } from './MapContainer';
+import { useNavigate } from 'react-router-dom';
 
 export interface Sample {
   id: string;
@@ -30,6 +31,7 @@ interface SampleRibbonProps {
 }
 
 export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
+  const navigate = useNavigate();
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,6 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching samples for study:', studyId);
         
         const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/samples`);
         if (!response.ok) {
@@ -50,51 +51,34 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
         }
         
         const data = await response.json();
-        console.log('Received samples data:', data);
         
         if (!Array.isArray(data)) {
-          console.warn('Invalid samples data structure:', data);
+          console.warn('Invalid samples data structure');
           setSamples([]);
           return;
         }
-        
-        // Process the samples
-        const allSamples = data
-          .map((sample: any) => {
-            if (!sample || typeof sample !== 'object') {
-              console.warn('Invalid sample data:', sample);
-              return null;
-            }
-            console.log('Processing sample:', sample); // Debug log
-            const processedSample: Sample = {
-              id: sample.id || 'unknown',
-              sample_name: sample.sample_name || 'Unnamed Sample',
-              collection_date: sample.collection_date || null,
-              collection_time: sample.collection_time || null,
-              ecosystem: sample.ecosystem || null,
-              ecosystem_category: sample.ecosystem_category || null,
-              ecosystem_type: sample.ecosystem_type || null,
-              ecosystem_subtype: sample.ecosystem_subtype || null,
-              specific_ecosystem: sample.specific_ecosystem || null,
-              latitude: typeof sample.latitude === 'number' ? sample.latitude : 
-                       typeof sample.latitude === 'string' ? parseFloat(sample.latitude) : null,
-              longitude: typeof sample.longitude === 'number' ? sample.longitude : 
-                        typeof sample.longitude === 'string' ? parseFloat(sample.longitude) : null,
-            };
-            console.log('Processed sample with coordinates:', processedSample); // Debug log
-            return processedSample;
-          })
-          .filter((sample): sample is Sample => sample !== null); // Type guard to remove nulls
-        
-        console.log('Processed samples:', allSamples);
-        
-        if (allSamples.length === 0) {
-          console.warn('No samples found after processing');
-        } else {
-          console.log('Successfully processed', allSamples.length, 'samples');
+
+        const processedSamples = data
+          .filter(sample => sample && typeof sample === 'object')
+          .map(sample => ({
+            id: sample.id || '',
+            sample_name: sample.sample_name || 'Unnamed Sample',
+            collection_date: sample.collection_date || null,
+            latitude: sample.latitude || null,
+            longitude: sample.longitude || null,
+            ecosystem: sample.ecosystem || null,
+            ecosystem_type: sample.ecosystem_type || null,
+            ecosystem_subtype: sample.ecosystem_subtype || null,
+            specific_ecosystem: sample.specific_ecosystem || null
+          }));
+
+        if (processedSamples.length === 0) {
+          console.warn('No samples found');
+          setSamples([]);
+          return;
         }
-        
-        setSamples(allSamples);
+
+        setSamples(processedSamples);
       } catch (err) {
         console.error('Error fetching samples:', err);
         setError(err instanceof Error ? err.message : 'An error occurred while fetching samples');
@@ -130,6 +114,10 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
       ecosystem_subtype: sample.ecosystem_subtype,
       specific_ecosystem: sample.specific_ecosystem,
     }));
+
+  const handleSampleClick = (sampleId: string) => {
+    navigate(`/studies/${studyId}/samples/${sampleId}`);
+  };
 
   if (loading) {
     return (
@@ -219,10 +207,20 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
                 sx={{
                   minWidth: 250,
                   maxWidth: 300,
-                  flexShrink: 0
+                  flexShrink: 0,
+                  cursor: 'pointer'
                 }}
+                onClick={() => handleSampleClick(sample.id)}
               >
-                <Paper sx={{ p: 2, height: '100%' }}>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    height: '100%',
+                    '&:hover': {
+                      boxShadow: 6,
+                    },
+                  }}
+                >
                   <Typography 
                     variant="subtitle1" 
                     gutterBottom 

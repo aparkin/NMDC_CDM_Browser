@@ -276,8 +276,11 @@ class StudySummaryProcessor:
         for _, study in self.study_df.iterrows():
             study_id = str(study["id"])  # Ensure study_id is a string
             
-            # Get unique sample locations
+            # Get unique samples for this study
             study_samples = self.sample_df[self.sample_df['study_id'] == study_id]
+            unique_samples = len(study_samples['id'].unique())
+            
+            # Get unique sample locations for mapping
             unique_locations = study_samples[['latitude', 'longitude']].drop_duplicates()
             
             # Get primary ecosystem
@@ -291,7 +294,7 @@ class StudySummaryProcessor:
                 "id": study_id,
                 "name": study["name"],
                 "description": study.get("description", ""),
-                "sample_count": len(unique_locations),
+                "sample_count": unique_samples,  # Changed from len(unique_locations) to unique_samples
                 "measurement_types": self.get_measurement_types(study_id),
                 "primary_ecosystem": primary_ecosystem,
                 "add_date": study["add_date"].isoformat() if pd.notnull(study["add_date"]) else None,

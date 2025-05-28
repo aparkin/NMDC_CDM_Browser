@@ -174,9 +174,19 @@ The application uses caching to improve performance. Cache files are stored in:
 When making changes to data processing logic (e.g., species count calculations), clear the cache:
 
 ```bash
-rm -rf processed_data/study_analysis_cache/* processed_data/study_summary.json
+# Clear all cache files
+rm -rf processed_data/study_analysis_cache/* processed_data/sample_analysis_cache/* processed_data/study_summary.json
+
+# Regenerate study summary data (metadata, sample counts, etc.)
+python src/data_processing/study_summary_processor.py
+
+# Regenerate detailed analysis data
 python src/data_processing/process_data.py
 ```
+
+The application uses two main data processing scripts:
+- `study_summary_processor.py`: Generates study metadata, sample counts, and geographic distributions
+- `process_data.py`: Handles detailed analysis including omics data, taxonomic analysis, and statistical measures
 
 ## Troubleshooting
 

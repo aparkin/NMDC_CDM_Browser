@@ -95,6 +95,10 @@ When making changes to data processing logic (e.g., species count calculations, 
 
 2. Regenerate the data:
    ```bash
+   # For study summary data (metadata, sample counts, etc.)
+   python src/data_processing/study_summary_processor.py
+   
+   # For detailed analysis data
    python src/data_processing/process_data.py
    ```
 
@@ -103,11 +107,9 @@ This ensures that:
 - Study-wide statistics are regenerated
 - All data tables and visualizations reflect the latest processing methods
 
-Note: The preprocessing script handles:
-- Loading and processing sample data
-- Generating study summaries
-- Creating geographic distributions
-- Calculating statistical measures
+Note: The preprocessing scripts handle:
+- `study_summary_processor.py`: Generates study metadata, sample counts, and geographic distributions
+- `process_data.py`: Handles detailed analysis including omics data, taxonomic analysis, and statistical measures
 
 ### Application Startup Procedures
 

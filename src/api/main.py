@@ -7,7 +7,7 @@ import logging
 from . import statistics
 from . import llm_summarizer
 from .study_analysis import router as study_analysis_router
-from .routers import studies
+from .routers import studies, samples
 from ..data_processing.study_analysis_processor import StudyAnalysisProcessor
 from src.api.study_detail_summarizer import StudyDetailSummarizer
 
@@ -53,6 +53,9 @@ app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysi
 # Include the studies router
 app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
 
+# Include the samples router
+app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
+
 # Load processed data
 def load_summary_data() -> Dict:
     """
@@ -94,7 +97,11 @@ summarizer = StudyDetailSummarizer()
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to NMDC CDM Browser API"}
+    return {
+        "name": "NMDC CDM Browser API",
+        "version": "1.0.0",
+        "description": "API for browsing and analyzing NMDC Common Data Model data"
+    }
 
 @app.get("/api/studies/summary")
 async def get_study_summary():

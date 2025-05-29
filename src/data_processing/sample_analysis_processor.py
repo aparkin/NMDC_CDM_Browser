@@ -28,7 +28,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
         data_dir = Path("data")
         self.sample_table_path = data_dir / "sample_table_snappy.parquet"
         self.study_table_path = data_dir / "study_table_snappy.parquet"
-        self.contigs_table_path = data_dir / "contigs_rollup_table_snappy.parquet"
+        self.contigs_table_path = data_dir / "contigs_table_snappy.parquet"
         self.centrifuge_table_path = data_dir / "centrifuge_rollup_table_snappy.parquet"
         self.kraken_table_path = data_dir / "kraken_table_snappy.parquet"
         self.gottcha_table_path = data_dir / "gottcha_table_snappy.parquet"
@@ -36,6 +36,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
         self.lipidomics_table_path = data_dir / "lipidomics_table_snappy.parquet"
         self.proteomics_table_path = data_dir / "proteomics_table_snappy.parquet"
         self.taxonomy_table_path = data_dir / "taxonomy_table_snappy.parquet"
+        self.annotations_table_path = data_dir / "annotations_table_snappy.parquet"
         
         # Log available files
         for path in [
@@ -48,7 +49,8 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             self.metabolites_table_path,
             self.lipidomics_table_path,
             self.proteomics_table_path,
-            self.taxonomy_table_path
+            self.taxonomy_table_path,
+            self.annotations_table_path
         ]:
             if path.exists():
                 logger.info(f"Found data file: {path}")
@@ -109,7 +111,8 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                 self.metabolites_table_path,
                 self.lipidomics_table_path,
                 self.proteomics_table_path,
-                self.taxonomy_table_path
+                self.taxonomy_table_path,
+                self.annotations_table_path
             ]
             
             # Check data files
@@ -200,6 +203,12 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             # Process taxonomic data
             taxonomic_data = self._process_sample_taxonomy(sample_data)
             
+            # Process functional analysis
+            functional_analysis = self._process_functional_analysis(sample_data)
+            
+            # Process taxonomic treemap
+            taxonomic_treemap = self._process_taxonomic_treemap(sample_id)
+            
             # Convert collection date/time to string or None
             collection_date = sample_data.iloc[0].get("collection_date")
             collection_time = sample_data.iloc[0].get("collection_time")
@@ -237,6 +246,8 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                 },
                 "taxonomic": taxonomic_data,
                 "location": location,
+                "functional_analysis": functional_analysis,
+                "taxonomic_treemap": taxonomic_treemap,
                 "last_modified": pd.Timestamp.now().isoformat()
             }
             
@@ -683,4 +694,169 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             return (value - stats["mean"]) / stats["std"]
         except Exception as e:
             logger.error(f"Error calculating z-score: {str(e)}")
-            return 0.0 
+            return 0.0
+            
+    def _process_functional_analysis(self, sample_data: pd.DataFrame) -> Dict:
+        """Process functional analysis data for a sample."""
+        try:
+            sample_id = sample_data.iloc[0]["id"]
+            logger.info(f"Processing functional analysis for sample {sample_id}")
+            
+            # Load annotations and contigs tables
+            logger.info("Loading annotations and contigs tables...")
+            annotations_df = pd.read_parquet(self.annotations_table_path)
+            contigs_df = pd.read_parquet(self.contigs_table_path)
+            logger.info(f"Loaded {len(annotations_df)} annotations and {len(contigs_df)} contigs")
+            
+            # Filter for this sample
+            sample_contigs = contigs_df[contigs_df["sample_id"] == sample_id]
+            logger.info(f"Found {len(sample_contigs)} contigs for sample {sample_id}")
+            
+            # Join annotations with contigs using correct column names
+            sample_annotations = annotations_df[annotations_df["contigs_id"].isin(sample_contigs["id"])]
+            logger.info(f"Found {len(sample_annotations)} annotations for sample {sample_id}")
+            
+            # Join annotations with contigs to get abundances
+            merged_df = pd.merge(
+                sample_annotations,
+                sample_contigs[["id", "scaffold_rel_abundance"]],
+                left_on="contigs_id",
+                right_on="id"
+            )
+            logger.info(f"Merged data has {len(merged_df)} rows")
+            
+            # Process each annotation class
+            annotation_classes = [
+                'product', 'pfam', 'superfamily', 'cath_funfam', 'cog',
+                'ko', 'ec_number', 'smart', 'tigrfam', 'ncRNA_class', 'regulatory_class'
+            ]
+            
+            results = {}
+            for class_name in annotation_classes:
+                if class_name in merged_df.columns:
+                    logger.info(f"Processing {class_name} annotations...")
+                    # Group by annotation label and sum abundances
+                    class_abundances = merged_df.groupby(class_name)["scaffold_rel_abundance"].sum()
+                    
+                    # Filter for labels with total abundance >= 0.1%
+                    significant_labels = class_abundances[class_abundances >= 0.001]
+                    logger.info(f"Found {len(significant_labels)} significant {class_name} labels")
+                    
+                    # Sort by abundance (descending)
+                    sorted_labels = significant_labels.sort_values(ascending=False)
+                    
+                    # Convert to dictionary
+                    results[class_name] = {
+                        label: float(abundance) 
+                        for label, abundance in sorted_labels.items()
+                    }
+                else:
+                    logger.info(f"No {class_name} column found in annotations")
+            
+            logger.info(f"Functional analysis complete. Found data for {len(results)} annotation classes")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error processing functional analysis: {str(e)}", exc_info=True)
+            return {}
+
+    def _process_taxonomic_treemap(self, sample_id: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Process taxonomic treemap data for a sample from both Kraken and Contigs data.
+        Returns a dictionary with treemap data for each source.
+        """
+        try:
+            logger.info(f"Processing taxonomic treemap for sample: {sample_id}")
+            result = {}
+
+            # Process Kraken data
+            kraken_df = pd.read_parquet(self.kraken_table_path)
+            kraken_sample = kraken_df[kraken_df['sample_id'] == sample_id].copy()
+            
+            if not kraken_sample.empty:
+                # Remove unclassified and empty lineages
+                kraken_sample = kraken_sample[
+                    (kraken_sample['lineage'] != 'Unclassified') & 
+                    (kraken_sample['lineage'] != '') & 
+                    (kraken_sample['lineage'].notna())
+                ]
+                
+                if not kraken_sample.empty:
+                    treemap_data = []
+                    for _, row in kraken_sample.iterrows():
+                        lineage_str = row['lineage']
+                        abundance = row['abundance']
+                        
+                        # Split lineage
+                        parts = [part.strip() for part in lineage_str.split(';') if part.strip()]
+                        
+                        # Create hierarchy entries
+                        for i in range(len(parts)):
+                            current_level = parts[:i+1]
+                            parent_level = parts[:i] if i > 0 else []
+                            
+                            treemap_data.append({
+                                'ids': ' > '.join(current_level),
+                                'labels': parts[i],
+                                'parents': ' > '.join(parent_level) if parent_level else '',
+                                'values': float(abundance),
+                                'level': i
+                            })
+                    
+                    # Convert to DataFrame and aggregate
+                    treemap_df = pd.DataFrame(treemap_data)
+                    treemap_agg = treemap_df.groupby(['ids', 'labels', 'parents', 'level']).agg({
+                        'values': 'sum'
+                    }).reset_index()
+                    
+                    result['kraken'] = treemap_agg.to_dict(orient='records')
+                    logger.info(f"Processed {len(treemap_agg)} Kraken treemap entries")
+
+            # Process Contigs data
+            contigs_df = pd.read_parquet(self.contigs_table_path)
+            contigs_sample = contigs_df[contigs_df['sample_id'] == sample_id].copy()
+            
+            if not contigs_sample.empty:
+                # Remove unclassified and empty lineages
+                contigs_sample = contigs_sample[
+                    (contigs_sample['lineage'] != 'Unclassified') & 
+                    (contigs_sample['lineage'] != '') & 
+                    (contigs_sample['lineage'].notna())
+                ]
+                
+                if not contigs_sample.empty:
+                    treemap_data = []
+                    for _, row in contigs_sample.iterrows():
+                        lineage_str = row['lineage']
+                        abundance = row['scaffold_rel_abundance']
+                        
+                        # Split lineage
+                        parts = [part.strip() for part in lineage_str.split(';') if part.strip()]
+                        
+                        # Create hierarchy entries
+                        for i in range(len(parts)):
+                            current_level = parts[:i+1]
+                            parent_level = parts[:i] if i > 0 else []
+                            
+                            treemap_data.append({
+                                'ids': ' > '.join(current_level),
+                                'labels': parts[i],
+                                'parents': ' > '.join(parent_level) if parent_level else '',
+                                'values': float(abundance),
+                                'level': i
+                            })
+                    
+                    # Convert to DataFrame and aggregate
+                    treemap_df = pd.DataFrame(treemap_data)
+                    treemap_agg = treemap_df.groupby(['ids', 'labels', 'parents', 'level']).agg({
+                        'values': 'sum'
+                    }).reset_index()
+                    
+                    result['contigs'] = treemap_agg.to_dict(orient='records')
+                    logger.info(f"Processed {len(treemap_agg)} Contigs treemap entries")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error processing taxonomic treemap for sample {sample_id}: {str(e)}")
+            return {} 

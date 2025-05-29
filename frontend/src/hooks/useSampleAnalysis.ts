@@ -68,6 +68,20 @@ export interface SampleAnalysis {
     latitude: number;
     longitude: number;
   };
+  functional_analysis: {
+    [class_name: string]: {
+      [label: string]: number;  // label -> relative abundance
+    };
+  };
+  taxonomic_treemap?: {
+    [source: string]: Array<{
+      ids: string;
+      labels: string;
+      parents: string;
+      values: number;
+      level: number;
+    }>;
+  };
 }
 
 const fetchSampleAnalysis = async (sampleId: string): Promise<SampleAnalysis> => {

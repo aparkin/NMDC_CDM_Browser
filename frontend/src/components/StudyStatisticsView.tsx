@@ -21,6 +21,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import Plot from 'react-plotly.js';
+import { API_ENDPOINTS } from '../config/api';
 
 interface StudyStatisticsViewProps {
   studyId: string;
@@ -126,23 +127,25 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   const [selectedEcosystemVar, setSelectedEcosystemVar] = useState(ECOSYSTEM_VARIABLES[0]);
 
   // Fetch study analysis data
-  const analysisQuery = useQuery({
+  const { data: analysisData, isLoading: isLoadingAnalysis, error: analysisError } = useQuery({
     queryKey: ['studyAnalysis', studyId],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/analysis`);
-      if (!response.ok) throw new Error('Failed to fetch study analysis');
-      const data = await response.json();
-      console.log('Analysis data received:', data);
-      return data;
+      const response = await fetch(API_ENDPOINTS.studies.analysis(studyId));
+      if (!response.ok) {
+        throw new Error('Failed to fetch study analysis data');
+      }
+      return response.json();
     }
   });
 
   // Fetch timeline data
-  const timelineQuery = useQuery({
-    queryKey: ['studyTimeline', studyId],
+  const { data: timelineData, isLoading: isLoadingTimeline, error: timelineError } = useQuery({
+    queryKey: ['timelineData'],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/statistics/timeline`);
-      if (!response.ok) throw new Error('Failed to fetch timeline data');
+      const response = await fetch(API_ENDPOINTS.statistics.timeline());
+      if (!response.ok) {
+        throw new Error('Failed to fetch timeline data');
+      }
       return response.json();
     }
   });
@@ -188,7 +191,7 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
     }
   };
 
-  if (analysisQuery.isLoading || timelineQuery.isLoading) {
+  if (isLoadingAnalysis || isLoadingTimeline) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress />
@@ -196,19 +199,19 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
     );
   }
 
-  if (analysisQuery.isError || timelineQuery.isError) {
+  if (analysisError || timelineError) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">
-          {analysisQuery.error?.message || timelineQuery.error?.message || 'An error occurred'}
+          {analysisError?.message || timelineError?.message || 'An error occurred'}
         </Alert>
       </Box>
     );
   }
 
   const renderTimeline = () => {
-    if (!timelineQuery.data) return null;
-    const data = timelineQuery.data as TimelineData;
+    if (!timelineData) return null;
+    const data = timelineData as TimelineData;
 
     // Aggregate samples by date for the compendium
     const compendiumSamples = data.sample_timeline.reduce((acc: { [key: string]: number }, sample) => {
@@ -326,8 +329,8 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   };
 
   const renderPhysicalVariables = () => {
-    if (!analysisQuery.data?.physical) return null;
-    const data = analysisQuery.data as AnalysisData;
+    if (!analysisData?.physical) return null;
+    const data = analysisData as AnalysisData;
 
     const variables = Object.entries(data.physical)
       .filter(([_, data]) => data.status === 'ok')
@@ -521,11 +524,11 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   };
 
   const renderOmics = () => {
-    if (!analysisQuery.data?.omics) {
-      console.log('No omics data available:', analysisQuery.data);
+    if (!analysisData?.omics) {
+      console.log('No omics data available:', analysisData);
       return null;
     }
-    const data = analysisQuery.data as AnalysisData;
+    const data = analysisData as AnalysisData;
     console.log('Raw omics data:', data.omics);
 
     return (
@@ -589,11 +592,11 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   };
 
   const renderTaxonomic = () => {
-    if (!analysisQuery.data?.taxonomic) {
-      console.log('No taxonomic data available:', analysisQuery.data);
+    if (!analysisData?.taxonomic) {
+      console.log('No taxonomic data available:', analysisData);
       return null;
     }
-    const data = analysisQuery.data as AnalysisData;
+    const data = analysisData as AnalysisData;
     console.log('Raw taxonomic data:', data.taxonomic);
 
     const top10Items = data.taxonomic.top10[selectedTaxonomicType]?.[selectedRank] || [];
@@ -750,7 +753,7 @@ const StudyStatisticsView: React.FC<StudyStatisticsViewProps> = ({ studyId }) =>
   };
 
   const renderEcosystem = () => {
-    const eco = analysisQuery.data?.ecosystem;
+    const eco = analysisData?.ecosystem;
     if (!eco || !eco.ecosystem_data) {
       return (
         <Box sx={{ p: 2 }}>

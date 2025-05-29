@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress, Alert, IconButton, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReactMarkdown from 'react-markdown';
+import { API_ENDPOINTS } from '../config/api';
 
 interface StudyAISummaryData {
   summary: string;
@@ -21,7 +22,7 @@ const StudyAISummary: React.FC<StudyAISummaryProps> = ({ studyId }) => {
   const fetchSummary = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/studies/${studyId}/summary/ai${forceRefresh ? '?force=true' : ''}`);
+      const response = await fetch(API_ENDPOINTS.studies.aiSummary(studyId, forceRefresh));
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error:', errorText);

@@ -3,6 +3,7 @@ import { Box, Typography, Paper, CircularProgress, Alert, IconButton, Tooltip } 
 import { format } from 'date-fns';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReactMarkdown from 'react-markdown';
+import { API_ENDPOINTS } from '../config/api';
 
 interface AISummaryData {
   summary: string;
@@ -19,7 +20,7 @@ const AISummary: React.FC = () => {
   const fetchSummary = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/summary/ai${forceRefresh ? '?force=true' : ''}`);
+      const response = await fetch(API_ENDPOINTS.summary.ai(forceRefresh));
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error:', errorText);

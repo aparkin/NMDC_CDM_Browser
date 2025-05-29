@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
-  Container,
   Typography,
   Paper,
-  Grid,
   Tab,
   Tabs,
   CircularProgress,
   Alert,
-  Button,
   FormControl,
   InputLabel,
   Select,
@@ -25,6 +22,7 @@ import { ResizableContainer } from '@/components/ResizableContainer';
 import Plot from 'react-plotly.js';
 import { useSampleAnalysis } from '@/hooks/useSampleAnalysis';
 import SampleAISummary from '../components/SampleAISummary';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface Sample {
   id: string;
@@ -85,12 +83,14 @@ const SampleDetail = () => {
 
   useEffect(() => {
     const fetchSampleData = async () => {
+      if (!studyId) return;  // Add type guard
+      
       try {
         setLoading(true);
         setError(null);
         
         // Fetch all samples for the study
-        const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/samples`);
+        const response = await fetch(API_ENDPOINTS.studies.samples(studyId));
         if (!response.ok) {
           throw new Error(`Failed to fetch samples: ${response.statusText}`);
         }
@@ -124,7 +124,7 @@ const SampleDetail = () => {
     }
   }, [studyId, sampleId]);
 
-  const handleAnalysisTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleAnalysisTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setAnalysisTabValue(newValue);
   };
 

@@ -25,6 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import Plot from 'react-plotly.js';
 import type { Data } from 'plotly.js';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface SampleStatisticsViewProps {
   studyId: string;
@@ -171,7 +172,7 @@ const SampleStatisticsView: React.FC<SampleStatisticsViewProps> = ({
   const sampleQuery = useQuery({
     queryKey: ['sample', studyId, sampleId],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/v1/sample/${sampleId}/analysis`);
+      const response = await fetch(API_ENDPOINTS.samples.analysis(sampleId));
       if (!response.ok) throw new Error('Failed to fetch sample data');
       return response.json();
     },
@@ -183,7 +184,7 @@ const SampleStatisticsView: React.FC<SampleStatisticsViewProps> = ({
   const studyAnalysisQuery = useQuery<StudyAnalysisData>({
     queryKey: ['studyAnalysis', studyId],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/analysis`);
+      const response = await fetch(API_ENDPOINTS.studies.analysis(studyId));
       if (!response.ok) throw new Error('Failed to fetch study analysis data');
       return response.json();
     },
@@ -195,7 +196,7 @@ const SampleStatisticsView: React.FC<SampleStatisticsViewProps> = ({
   const timelineQuery = useQuery<TimelineData>({
     queryKey: ['studyTimeline', studyId],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/statistics/timeline`);
+      const response = await fetch(API_ENDPOINTS.statistics.timeline());
       if (!response.ok) throw new Error('Failed to fetch timeline data');
       return response.json();
     },

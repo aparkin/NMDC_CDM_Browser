@@ -11,6 +11,7 @@ import {
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
 import type { GridProps } from '@mui/material';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface Study {
   id: string;
@@ -29,7 +30,7 @@ const StudySetSummary = () => {
   useEffect(() => {
     const fetchStudies = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/studies/cards');
+        const response = await axios.get(API_ENDPOINTS.studies.list());
         setStudies(response.data);
         setLoading(false);
       } catch (err) {
@@ -82,7 +83,7 @@ const StudySetSummary = () => {
 
       <Grid container spacing={3}>
         {filteredStudies.map((study) => (
-          <Grid item xs={12} sm={6} md={4} key={study.id} component="div">
+          <Grid key={study.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6', md: 'span 4' } }}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>

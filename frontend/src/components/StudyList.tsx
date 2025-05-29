@@ -7,6 +7,7 @@ import { StudyMap } from './StudyMap';
 import StatisticsView from './StatisticsView';
 import AISummary from './AISummary';
 import { ResizableContainer } from './ResizableContainer';
+import { API_ENDPOINTS } from '../config/api';
 
 interface Study {
   id: string;
@@ -59,7 +60,7 @@ const StudyList: React.FC = () => {
       const newHeight = Math.max(200, startHeight.current + deltaY);
 
       if (resizeType === 'mapStats') {
-        // Handle map stats resizing if needed
+        setHeight(newHeight);
       }
     };
 
@@ -83,7 +84,7 @@ const StudyList: React.FC = () => {
 
   const fetchStudies = async () => {
     try {
-      const response = await fetch('/api/studies/cards');
+      const response = await fetch(API_ENDPOINTS.studies.list());
       if (!response.ok) {
         throw new Error('Failed to fetch studies');
       }

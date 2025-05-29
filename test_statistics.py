@@ -4,7 +4,8 @@ from pprint import pprint
 from typing import Optional, Dict, Any
 import argparse
 
-BASE_URL = "http://localhost:8000/api/statistics"
+# Base URL for the API
+BASE_URL = "http://localhost:9000/api/statistics"
 
 def test_endpoint(endpoint: str, params: Optional[Dict[str, Any]] = None) -> None:
     """Test an endpoint and print the results"""

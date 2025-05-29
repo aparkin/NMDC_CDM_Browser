@@ -87,7 +87,7 @@ CMD ["serve", "-s", "dist", "-l", "3000"]
 ## Environment Configuration
 
 ### Environment Variables
-The application requires several environment variables to be set. These are managed through a `.env` file:
+The application requires several environment variables to be set. These are managed through a `.env` file in the root directory:
 
 ```bash
 # API Configuration
@@ -115,10 +115,14 @@ FRONTEND_PORT=3000
 BACKEND_URL=http://genomics.lbl.gov:9000
 ```
 
-### Environment File Handling
-1. The `.env` file is copied into the container during build
-2. The `.dockerignore` file is configured to allow copying the `.env` file
-3. Environment variables are loaded at runtime using python-dotenv
+### Environment Variable Handling
+1. The `.env` file is used by both frontend and backend
+2. For the frontend:
+   - In development: Vite automatically loads the root `.env` file
+   - In production: `BACKEND_URL` is passed to the container as `VITE_BACKEND_URL`
+3. For the backend:
+   - The `.env` file is copied into the container during build
+   - Environment variables are loaded at runtime using python-dotenv
 
 ## Container Management
 
@@ -128,7 +132,9 @@ BACKEND_URL=http://genomics.lbl.gov:9000
 podman build -t localhost/nmdc_backend:latest -f Dockerfile.backend .
 
 # Build frontend
-podman build -t localhost/nmdc_frontend:latest -f Dockerfile.frontend .
+podman build -t localhost/nmdc_frontend:latest \
+  --build-arg BACKEND_URL=${BACKEND_URL:-http://localhost:9000} \
+  -f Dockerfile.frontend .
 ```
 
 ### Running Containers
@@ -146,6 +152,7 @@ podman run -d --name nmdc_backend \
 # Run frontend
 podman run -d --name nmdc_frontend \
   --network host \
+  -e VITE_BACKEND_URL=${BACKEND_URL:-http://localhost:9000} \
   localhost/nmdc_frontend:latest
 ```
 

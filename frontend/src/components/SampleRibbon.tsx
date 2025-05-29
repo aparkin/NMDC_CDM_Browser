@@ -7,10 +7,12 @@ import {
   CircularProgress,
   IconButton,
   Collapse,
+  Alert,
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
 import { MapContainer } from './MapContainer';
 import { useNavigate } from 'react-router-dom';
+import { API_ENDPOINTS } from '../config/api';
 
 export interface Sample {
   id: string;
@@ -39,54 +41,25 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
-  useEffect(() => {
-    const fetchSamples = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/samples`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch samples: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!Array.isArray(data)) {
-          console.warn('Invalid samples data structure');
-          setSamples([]);
-          return;
-        }
-
-        const processedSamples = data
-          .filter(sample => sample && typeof sample === 'object')
-          .map(sample => ({
-            id: sample.id || '',
-            sample_name: sample.sample_name || 'Unnamed Sample',
-            collection_date: sample.collection_date || null,
-            latitude: sample.latitude || null,
-            longitude: sample.longitude || null,
-            ecosystem: sample.ecosystem || null,
-            ecosystem_type: sample.ecosystem_type || null,
-            ecosystem_subtype: sample.ecosystem_subtype || null,
-            specific_ecosystem: sample.specific_ecosystem || null
-          }));
-
-        if (processedSamples.length === 0) {
-          console.warn('No samples found');
-          setSamples([]);
-          return;
-        }
-
-        setSamples(processedSamples);
-      } catch (err) {
-        console.error('Error fetching samples:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching samples');
-      } finally {
-        setLoading(false);
+  const fetchSamples = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(API_ENDPOINTS.studies.samples(studyId));
+      if (!response.ok) {
+        throw new Error('Failed to fetch samples');
       }
-    };
+      const data = await response.json();
+      setSamples(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching samples:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching samples');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (studyId) {
       fetchSamples();
     }
@@ -130,7 +103,7 @@ export const SampleRibbon: React.FC<SampleRibbonProps> = ({ studyId }) => {
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography color="error">Error: {error}</Typography>
+        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }

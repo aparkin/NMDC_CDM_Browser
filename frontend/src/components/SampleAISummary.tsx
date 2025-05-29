@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress, Alert, IconButton, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReactMarkdown from 'react-markdown';
+import { API_ENDPOINTS } from '../config/api';
 
 interface SampleAISummaryData {
   summary: string;
@@ -21,7 +22,7 @@ const SampleAISummary: React.FC<SampleAISummaryProps> = ({ sampleId }) => {
   const fetchSummary = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/v1/sample/${sampleId}/summary/ai${forceRefresh ? '?force=true' : ''}`);
+      const response = await fetch(API_ENDPOINTS.samples.aiSummary(sampleId, forceRefresh));
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error:', errorText);

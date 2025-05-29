@@ -12,6 +12,7 @@ import { SampleRibbon } from '@/components/SampleRibbon';
 import { ResizableContainer } from '@/components/ResizableContainer';
 import StudyAISummary from '../components/StudyAISummary';
 import StudyStatisticsView from '../components/StudyStatisticsView';
+import { API_ENDPOINTS } from '../config/api';
 
 interface Study {
   id: string;
@@ -55,33 +56,34 @@ const StudyDetail: React.FC = () => {
   const [study, setStudy] = useState<Study | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasSamples, setHasSamples] = useState(true);
 
   useEffect(() => {
-    const fetchStudyData = async () => {
+    const fetchData = async () => {
+      if (!studyId) return;
+      
       try {
-        setLoading(true);
-        setError(null);
-        
         // Fetch study details
-        const studyResponse = await fetch(`http://localhost:8000/api/v1/study/${studyId}`);
-        if (!studyResponse.ok) {
-          throw new Error(`Failed to fetch study: ${studyResponse.statusText}`);
-        }
+        const studyResponse = await fetch(API_ENDPOINTS.studies.detail(studyId));
+        if (!studyResponse.ok) throw new Error('Failed to fetch study details');
         const studyData = await studyResponse.json();
-        
-        // Fetch study analysis for map data
-        const analysisResponse = await fetch(`http://localhost:8000/api/v1/study/${studyId}/analysis`);
-        if (!analysisResponse.ok) {
-          throw new Error(`Failed to fetch study analysis: ${analysisResponse.statusText}`);
-        }
-        await analysisResponse.json(); // We don't need to store this data
+        setStudy(studyData);
 
-        // Fetch samples data
-        const samplesResponse = await fetch(`http://localhost:8000/api/v1/study/${studyId}/samples`);
-        if (!samplesResponse.ok) {
-          throw new Error(`Failed to fetch samples: ${samplesResponse.statusText}`);
-        }
+        // Fetch samples first to check if study has any samples
+        const samplesResponse = await fetch(API_ENDPOINTS.studies.samples(studyId));
+        if (!samplesResponse.ok) throw new Error('Failed to fetch samples');
         const samplesData = await samplesResponse.json();
+
+        if (!samplesData || samplesData.length === 0) {
+          setHasSamples(false);
+          setLoading(false);
+          return;
+        }
+
+        // Only fetch analysis data if we have samples
+        const analysisResponse = await fetch(API_ENDPOINTS.studies.analysis(studyId));
+        if (!analysisResponse.ok) throw new Error('Failed to fetch analysis data');
+        const analysisData = await analysisResponse.json();
 
         // Group samples by location
         const locationMap = new Map<string, any>();
@@ -130,17 +132,16 @@ const StudyDetail: React.FC = () => {
           ...studyData,
           sample_locations: locations
         });
-      } catch (err) {
-        console.error('Error fetching study data:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError(error instanceof Error ? error.message : 'An error occurred');
         setLoading(false);
       }
     };
 
-    if (studyId) {
-      fetchStudyData();
-    }
+    fetchData();
   }, [studyId]);
 
   if (!studyId) {
@@ -173,6 +174,27 @@ const StudyDetail: React.FC = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Typography>Study not found</Typography>
+      </Box>
+    );
+  }
+
+  if (!hasSamples) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h4" gutterBottom>
+            {study.name}
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+            Study ID: {study.id}
+          </Typography>
+          <Typography variant="body1" paragraph>
+            {study.description}
+          </Typography>
+          <Alert severity="info">
+            This study has no samples available for analysis.
+          </Alert>
+        </Paper>
       </Box>
     );
   }

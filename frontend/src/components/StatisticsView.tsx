@@ -26,6 +26,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, XAxis, YAxis, Tooltip as RechartsTooltip, Bar, ResponsiveContainer } from 'recharts';
 import Plot from 'react-plotly.js';
+import { API_ENDPOINTS } from '../config/api';
 
 // Types for our data
 interface TimelineData {
@@ -253,123 +254,65 @@ const TAXONOMIC_TOOLTIPS: Record<string, string> = {
 };
 
 const StatisticsView: React.FC = () => {
-  // State for active tab and selected variables
-  const [activeTab, setActiveTab] = useState(0);
-  const [selectedEcosystem, setSelectedEcosystem] = useState<string>(ECOSYSTEM_VARIABLES[0]);
-  const [selectedPhysical, setSelectedPhysical] = useState<string>(PHYSICAL_VARIABLES[0]);
-  const [selectedOmics, setSelectedOmics] = useState<string>(OMICS_TYPES[0]);
-  const [selectedTaxonomic, setSelectedTaxonomic] = useState<string>(TAXONOMIC_TYPES[0]);
+  const [tabValue, setTabValue] = useState(0);
+  const [selectedEcosystem, setSelectedEcosystem] = useState(ECOSYSTEM_VARIABLES[0]);
+  const [selectedPhysical, setSelectedPhysical] = useState(PHYSICAL_VARIABLES[0]);
+  const [selectedOmics, setSelectedOmics] = useState(OMICS_TYPES[0]);
+  const [selectedTaxonomic, setSelectedTaxonomic] = useState(TAXONOMIC_TYPES[0]);
   const [selectedRank, setSelectedRank] = useState<string>('superkingdom');
 
-  // Queries with enhanced error handling
+  // Timeline data query
   const timelineQuery = useQuery<TimelineData>({
     queryKey: ['timeline'],
-    queryFn: () => fetch('http://localhost:8000/api/statistics/timeline').then(res => {
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      return res.json();
-    }),
-    retry: (failureCount, error) => {
-      if (failureCount < 3 && (
-        error instanceof TypeError ||
-        (error instanceof Error && error.message.includes('500'))
-      )) {
-        return true;
-      }
-      return false;
+    queryFn: async () => {
+      const response = await fetch(API_ENDPOINTS.statistics.timeline());
+      if (!response.ok) throw new Error('Failed to fetch timeline data');
+      return response.json();
     }
   });
 
+  // Ecosystem data query
   const ecosystemQuery = useQuery<EcosystemData>({
     queryKey: ['ecosystem', selectedEcosystem],
-    queryFn: () => fetch(`http://localhost:8000/api/statistics/ecosystem/${selectedEcosystem}`).then(res => {
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      return res.json();
-    }),
-    enabled: !!selectedEcosystem && ECOSYSTEM_VARIABLES.includes(selectedEcosystem),
-    retry: (failureCount, error) => {
-      if (failureCount < 3 && (
-        error instanceof TypeError ||
-        (error instanceof Error && error.message.includes('500'))
-      )) {
-        return true;
-      }
-      return false;
+    queryFn: async () => {
+      const response = await fetch(API_ENDPOINTS.statistics.ecosystem(selectedEcosystem));
+      if (!response.ok) throw new Error('Failed to fetch ecosystem data');
+      return response.json();
     }
   });
 
+  // Physical variable data query
   const physicalQuery = useQuery<PhysicalVariableData>({
     queryKey: ['physical', selectedPhysical],
-    queryFn: () => {
-      console.log('Fetching physical data for:', selectedPhysical);
-      return fetch(`http://localhost:8000/api/statistics/physical/${selectedPhysical}`).then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      });
-    },
-    enabled: !!selectedPhysical && PHYSICAL_VARIABLES.includes(selectedPhysical),
-    retry: (failureCount, error) => {
-      if (failureCount < 3 && (
-        error instanceof TypeError ||
-        (error instanceof Error && error.message.includes('500'))
-      )) {
-        return true;
-      }
-      return false;
+    queryFn: async () => {
+      const response = await fetch(API_ENDPOINTS.statistics.physical(selectedPhysical));
+      if (!response.ok) throw new Error('Failed to fetch physical variable data');
+      return response.json();
     }
   });
 
+  // Omics data query
   const omicsQuery = useQuery<OmicsData[]>({
     queryKey: ['omics', selectedOmics],
-    queryFn: () => {
-      console.log('Fetching omics data for:', selectedOmics);
-      return fetch(`http://localhost:8000/api/statistics/omics/${selectedOmics}`).then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      });
-    },
-    retry: (failureCount, error) => {
-      if (failureCount < 3 && (
-        error instanceof TypeError ||
-        (error instanceof Error && error.message.includes('500'))
-      )) {
-        return true;
-      }
-      return false;
+    queryFn: async () => {
+      const response = await fetch(API_ENDPOINTS.statistics.omics(selectedOmics));
+      if (!response.ok) throw new Error('Failed to fetch omics data');
+      return response.json();
     }
   });
 
+  // Taxonomic data query
   const taxonomicQuery = useQuery<TaxonomicData>({
     queryKey: ['taxonomic', selectedTaxonomic],
-    queryFn: () => {
-      console.log('Fetching taxonomic data for:', selectedTaxonomic);
-      return fetch(`http://localhost:8000/api/statistics/taxonomic/${selectedTaxonomic}`).then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      });
-    },
-    retry: (failureCount, error) => {
-      if (failureCount < 3 && (
-        error instanceof TypeError ||
-        (error instanceof Error && error.message.includes('500'))
-      )) {
-        return true;
-      }
-      return false;
+    queryFn: async () => {
+      const response = await fetch(API_ENDPOINTS.statistics.taxonomic(selectedTaxonomic));
+      if (!response.ok) throw new Error('Failed to fetch taxonomic data');
+      return response.json();
     }
   });
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
+    setTabValue(newValue);
   };
 
   // Handler functions for dropdown changes
@@ -411,11 +354,11 @@ const StatisticsView: React.FC = () => {
         <Button 
           size="small" 
           onClick={() => {
-            if (activeTab === 0) timelineQuery.refetch();
-            else if (activeTab === 1) ecosystemQuery.refetch();
-            else if (activeTab === 2) physicalQuery.refetch();
-            else if (activeTab === 3) omicsQuery.refetch();
-            else if (activeTab === 4) taxonomicQuery.refetch();
+            if (tabValue === 0) timelineQuery.refetch();
+            else if (tabValue === 1) ecosystemQuery.refetch();
+            else if (tabValue === 2) physicalQuery.refetch();
+            else if (tabValue === 3) omicsQuery.refetch();
+            else if (tabValue === 4) taxonomicQuery.refetch();
           }}
           sx={{ ml: 2 }}
         >
@@ -445,7 +388,7 @@ const StatisticsView: React.FC = () => {
       }}>
         <Paper sx={{ width: '100%', mb: 1 }}>
           <Tabs
-            value={activeTab}
+            value={tabValue}
             onChange={handleTabChange}
             indicatorColor="primary"
             textColor="primary"
@@ -464,7 +407,7 @@ const StatisticsView: React.FC = () => {
         {/* Tab Panels */}
         <Box sx={{ flex: 1, overflow: 'auto', p: 1, width: '100%' }}>
           {/* Timeline Panel */}
-          {activeTab === 0 && (
+          {tabValue === 0 && (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1">Timeline Data</Typography>
@@ -487,16 +430,12 @@ const StatisticsView: React.FC = () => {
                     <Typography variant="h6" gutterBottom>Study Timeline</Typography>
                     <Box sx={{ height: 400 }}>
                       <Plot
-                        data={timelineQuery.data.study_timelines.map(study => ({
+                        data={timelineQuery.data.study_timelines.map((study: { study_id: string; start_date: string; end_date: string }) => ({
                           x: [new Date(study.start_date), new Date(study.end_date)],
                           y: [study.study_id, study.study_id],
                           type: 'scatter',
-                          mode: 'lines+markers',
-                          name: study.study_id,
-                          text: [`${study.sample_count} samples`, `${study.sample_count} samples`],
-                          hoverinfo: 'text',
-                          line: { width: 2 },
-                          showlegend: false
+                          mode: 'lines',
+                          name: study.study_id
                         }))}
                         layout={{
                           autosize: true,
@@ -524,10 +463,9 @@ const StatisticsView: React.FC = () => {
                     <Box sx={{ height: 400 }}>
                       <Plot
                         data={[{
-                          x: timelineQuery.data.sample_timeline.map(sample => new Date(sample.date)),
+                          x: timelineQuery.data.sample_timeline.map((sample: { date: string }) => new Date(sample.date)),
                           type: 'histogram',
-                          name: 'Sample Count',
-                          marker: { color: '#82ca9d' }
+                          name: 'Sample Count'
                         }]}
                         layout={{
                           autosize: true,
@@ -551,7 +489,7 @@ const StatisticsView: React.FC = () => {
           )}
 
           {/* Ecosystem Panel */}
-          {activeTab === 1 && (
+          {tabValue === 1 && (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -615,13 +553,13 @@ const StatisticsView: React.FC = () => {
                           </TableHead>
                           <TableBody>
                             {Object.entries(ecosystemQuery.data.value_counts)
-                              .sort(([,a], [,b]) => b - a)
+                              .sort(([, a], [, b]) => (b as number) - (a as number))
                               .map(([value, count]) => (
                                 <TableRow key={value}>
                                   <TableCell>{value}</TableCell>
-                                  <TableCell align="right">{count}</TableCell>
+                                  <TableCell align="right">{count as number}</TableCell>
                                   <TableCell align="right">
-                                    {((count / ecosystemQuery.data.total_samples) * 100).toFixed(1)}%
+                                    {((count as number / ecosystemQuery.data.total_samples) * 100).toFixed(1)}%
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -636,7 +574,7 @@ const StatisticsView: React.FC = () => {
           )}
 
           {/* Physical Variables Panel */}
-          {activeTab === 2 && (
+          {tabValue === 2 && (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -719,7 +657,7 @@ const StatisticsView: React.FC = () => {
                         <Box sx={{ height: 250 }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
-                              data={physicalQuery.data.histogram.values.map((value, index) => ({
+                              data={physicalQuery.data.histogram.values.map((value: number, index: number) => ({
                                 value,
                                 range: `${physicalQuery.data.histogram.bin_edges[index].toFixed(2)} - ${physicalQuery.data.histogram.bin_edges[index + 1].toFixed(2)}`
                               }))}
@@ -740,7 +678,7 @@ const StatisticsView: React.FC = () => {
           )}
 
           {/* Omics Panel */}
-          {activeTab === 3 && (
+          {tabValue === 3 && (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -826,10 +764,10 @@ const StatisticsView: React.FC = () => {
                         </TableHead>
                         <TableBody>
                           {omicsQuery.data
-                            .filter(item => item && typeof item.mean_abundance === 'number' && !isNaN(item.mean_abundance))
-                            .sort((a, b) => b.mean_abundance - a.mean_abundance)
-                            .map((item, index) => (
-                              <TableRow key={`${item.compound_name || item.lipid_molecular_species || item.product || 'unknown'}-${index}`}>
+                            .filter((item: OmicsData) => item && typeof item.mean_abundance === 'number' && !isNaN(item.mean_abundance))
+                            .sort((a: OmicsData, b: OmicsData) => b.mean_abundance - a.mean_abundance)
+                            .map((item: OmicsData) => (
+                              <TableRow key={`${item.compound_name || item.lipid_molecular_species || item.product || 'unknown'}-${item.mean_abundance}`}>
                                 <TableCell>
                                   {selectedOmics === 'metabolomics' ? item.compound_name :
                                    selectedOmics === 'lipidomics' ? item.lipid_molecular_species :
@@ -875,7 +813,7 @@ const StatisticsView: React.FC = () => {
           )}
 
           {/* Taxonomic Panel */}
-          {activeTab === 4 && (
+          {tabValue === 4 && (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 2 }}>
                 <FormControl size="small" sx={{ minWidth: 200 }}>

@@ -2,29 +2,39 @@ version: '3.8'
 
 services:
   backend:
+    container_name: nmdc_backend
     build:
       context: .
       dockerfile: Dockerfile.backend
+    image: localhost/nmdc_backend:latest
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "9000:8000"
     volumes:
-      - ./data:/app/data
-      - ./processed_data:/app/processed_data
+      - ./data:/app/data:ro
+      - ./processed_data:/app/processed_data:ro
     environment:
       - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - BASE_PATH=/cdm-browser
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/cdm-browser/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   frontend:
+    container_name: nmdc_frontend
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    image: localhost/nmdc_frontend:latest
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - REACT_APP_API_URL=${BACKEND_URL:-http://localhost:8000}
+      - REACT_APP_API_URL=${BACKEND_URL:-http://localhost:9000}/cdm-browser
+      - NODE_ENV=${ENVIRONMENT:-development}
+      - BASE_PATH=/cdm-browser
     depends_on:
-      - backend 
+      - backend
+    restart: unless-stopped 

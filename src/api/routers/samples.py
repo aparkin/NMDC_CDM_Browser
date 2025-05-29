@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 import logging
 from typing import Dict
 from ...data_processing.sample_analysis_processor import SampleAnalysisProcessor
+from ..sample_detail_summarizer import SampleDetailSummarizer
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -11,6 +12,7 @@ router = APIRouter()
 
 # Initialize processor
 processor = SampleAnalysisProcessor()
+summarizer = SampleDetailSummarizer()
 
 @router.get("/{sample_id}/analysis",
     response_model=Dict,
@@ -100,4 +102,27 @@ async def get_sample_analysis(sample_id: str, force_refresh: bool = False) -> Di
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error processing sample {sample_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{sample_id}/summary/ai")
+async def get_sample_ai_summary(sample_id: str, force: bool = False):
+    """
+    Get AI-generated summary for a specific sample.
+    
+    Args:
+        sample_id (str): The unique identifier of the sample
+        force (bool): If true, forces regeneration of the summary
+        
+    Returns:
+        Dict: AI-generated summary with sections and metadata
+        
+    Raises:
+        HTTPException: If sample is not found or summary generation fails
+    """
+    try:
+        logger.info(f"Generating AI summary for sample {sample_id} (force={force})")
+        summary = summarizer.generate_summary(sample_id, force=force)
+        return summary
+    except Exception as e:
+        logger.error(f"Error generating AI summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

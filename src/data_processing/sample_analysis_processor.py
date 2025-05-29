@@ -270,70 +270,69 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             raise
             
     def _process_sample_physical_variables(self, sample_data: pd.DataFrame) -> Dict:
-        """Process physical variables for a sample."""
+        """Process physical variables for a sample using cached study analysis."""
         try:
             # Get study ID
             study_id = sample_data.iloc[0]["study_id"]
+            study_cache_path = Path("processed_data/study_analysis_cache") / f"{study_id}.json"
             
-            # Process physical variables
+            if not study_cache_path.exists():
+                logger.warning(f"No study analysis found for {study_id}")
+                return {}
+                
+            with open(study_cache_path, 'r') as f:
+                study_data = json.load(f)
+                
+            # Get physical variables from study analysis
+            analysis_data = study_data.get('analysis', {})
+            study_physical_vars = analysis_data.get("physical", {})
+            
+            # Get sample's physical variables
             physical_vars = {}
             for col in sample_data.columns:
                 if col.endswith('_numeric') or col in ['depth', 'latitude', 'longitude', 'ph']:
                     value = sample_data.iloc[0][col]
                     if pd.notna(value):
-                        # Get compendium stats for this variable
-                        stats = self._get_compendium_stats(col)
-                        if stats:
-                            z_score = self._calculate_z_score(value, stats)
+                        # Use cached statistics if available
+                        if col in study_physical_vars:
                             physical_vars[col] = {
                                 'value': value,
-                                'z_score': z_score,
-                                'mean': stats['mean'],
-                                'std': stats['std']
+                                'z_score': study_physical_vars[col].get('z_score'),
+                                'mean': study_physical_vars[col].get('mean'),
+                                'std': study_physical_vars[col].get('std')
                             }
+                        else:
+                            # Fallback to compendium stats only if not in study cache
+                            stats = self._get_compendium_stats(col)
+                            if stats:
+                                z_score = self._calculate_z_score(value, stats)
+                                physical_vars[col] = {
+                                    'value': value,
+                                    'z_score': z_score,
+                                    'mean': stats['mean'],
+                                    'std': stats['std']
+                                }
             
-            # Add ecosystem variables
+            # Add ecosystem variables from study cache
             ecosystem_vars = [
                 'ecosystem', 'ecosystem_category', 'ecosystem_subtype',
                 'ecosystem_type', 'env_broad_scale_label', 'env_local_scale_label',
                 'specific_ecosystem', 'env_medium_label', 'soil_horizon', 'soil_type'
             ]
             
-            # Load the full sample table for compendium calculations
-            full_sample_df = pd.read_parquet(self.sample_table_path)
-            
-            # Get study samples
-            study_samples_df = full_sample_df[full_sample_df['study_id'] == study_id]
-            study_total = len(study_samples_df)
-            
-            # Get compendium total
-            compendium_total = len(full_sample_df)
-            
             for var in ecosystem_vars:
                 if var in sample_data.columns:
                     value = sample_data.iloc[0][var]
-                    
                     if pd.notna(value):
-                        # Calculate study frequency
-                        study_matches = len(study_samples_df[study_samples_df[var] == value])
-                        study_frequency = (study_matches / study_total * 100) if study_total > 0 else 0
-                        
-                        # Calculate compendium frequency
-                        compendium_matches = len(full_sample_df[full_sample_df[var] == value])
-                        compendium_frequency = (compendium_matches / compendium_total * 100) if compendium_total > 0 else 0
-                        
-                        physical_vars[var] = {
-                            'value': value,
-                            'study_frequency': study_frequency,
-                            'compendium_frequency': compendium_frequency
-                        }
-                    else:
-                        # Handle null values
-                        physical_vars[var] = {
-                            'value': 'No data',
-                            'study_frequency': 0,
-                            'compendium_frequency': 0
-                        }
+                        # Use cached ecosystem data if available
+                        if var in study_physical_vars:
+                            physical_vars[var] = study_physical_vars[var]
+                        else:
+                            physical_vars[var] = {
+                                'value': value,
+                                'study_frequency': 0,
+                                'compendium_frequency': 0
+                            }
                 else:
                     physical_vars[var] = {
                         'value': 'No data',
@@ -347,7 +346,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             return {}
         
     def _process_sample_omics(self, sample_data: pd.DataFrame) -> Dict:
-        """Process omics data for a sample."""
+        """Process omics data for a sample using cached study analysis."""
         # Get study ID to look up the top compounds
         study_id = sample_data.iloc[0]["study_id"]
         study_cache_path = Path("processed_data/study_analysis_cache") / f"{study_id}.json"
@@ -367,16 +366,10 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             if not omics_data:
                 logger.warning(f"No omics data found in study analysis for {study_id}")
                 return {"top10": {}}
-                
-            # Log study targets for metabolomics only
-            if "metabolomics" in omics_data:
-                logger.info(f"\nStudy {study_id} metabolomics targets:")
-                target_compounds = [compound.get("id") or compound.get("name") for compound in omics_data["metabolomics"]]
-                logger.info(f"Looking for compounds: {', '.join(target_compounds)}")
-            elif "proteomics" in omics_data:
-                logger.info(f"\nStudy {study_id} proteomics targets:")
-                target_compounds = [compound.get("id") or compound.get("name") for compound in omics_data["proteomics"]]
-                logger.info(f"Looking for proteins: {', '.join(target_compounds)}")
+            
+            # Get sample's compound data
+            sample_id = sample_data.iloc[0]["id"]
+            results = {}
             
             # Map our expected keys to the actual keys in the cache
             omics_type_map = {
@@ -385,7 +378,6 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                 "proteins": "proteomics"
             }
             
-            results = {}
             for our_type, cache_type in omics_type_map.items():
                 if cache_type in omics_data:
                     results[our_type] = self._get_top_compounds(sample_data, our_type)
@@ -402,7 +394,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             return {"top10": {}}
             
     def _process_sample_taxonomy(self, sample_data: pd.DataFrame) -> Dict:
-        """Process taxonomic data for a sample."""
+        """Process taxonomic data for a sample using cached study analysis."""
         # Get study ID to look up the top taxa
         study_id = sample_data.iloc[0]["study_id"]
         study_cache_path = Path("processed_data/study_analysis_cache") / f"{study_id}.json"
@@ -422,13 +414,6 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             if not taxonomy_data:
                 logger.warning(f"No taxonomy data found in study analysis for {study_id}")
                 return {"top10": {}}
-                
-            # Get sample ID for logging
-            sample_id = sample_data.iloc[0]["id"]
-                
-            # Log GOTTCHA study targets
-            if "gottcha" in taxonomy_data:
-                logger.info("Processing GOTTCHA data...")
             
             results = {
                 "contigs": self._get_top_taxa(sample_data, "contigs"),
@@ -436,10 +421,6 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                 "kraken": self._get_top_taxa(sample_data, "kraken"),
                 "gottcha": self._get_top_taxa(sample_data, "gottcha")
             }
-            
-            # Log GOTTCHA sample matches
-            if "gottcha" in results:
-                logger.info("GOTTCHA data processed successfully")
             
             return {
                 "top10": results
@@ -450,7 +431,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             return {"top10": {}}
         
     def _get_top_compounds(self, sample_data: pd.DataFrame, compound_type: str) -> List[Dict]:
-        """Get top 10 most abundant compounds of a specific type."""
+        """Get top compounds of a specific type with detailed metadata."""
         try:
             # Map our expected keys to the actual keys in the cache
             omics_type_map = {
@@ -490,38 +471,44 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             # Get the sample's compound data
             sample_id = sample_data.iloc[0]["id"]
             compound_data = {}
+            compound_metadata = {}
             
             # Load the appropriate compound table
             table_path = None
             value_col = None
             id_col = None
+            metadata_cols = []
+            
             if compound_type == "metabolites":
                 table_path = self.metabolites_table_path
                 value_col = "Peak Area"
                 id_col = "Compound Name"
+                metadata_cols = ["Formula", "Mass", "Retention Time", "Pathway", "Class"]
             elif compound_type == "lipids":
                 table_path = self.lipidomics_table_path
                 value_col = "Area"
                 id_col = "Lipid Molecular Species"
+                metadata_cols = ["Lipid Class", "Fatty Acid Composition", "Total Carbon", "Total Double Bonds"]
             elif compound_type == "proteins":
                 table_path = self.proteomics_table_path
                 value_col = "SummedPeptideMASICAbundances"
                 id_col = "Product"
+                metadata_cols = ["Gene Name", "Protein Name", "Molecular Weight", "Function", "Pathway"]
                 
             if table_path and table_path.exists():
                 try:
                     df = pd.read_parquet(table_path)
                     sample_df = df[df["sample_id"] == sample_id]
                     if not sample_df.empty:
-                        missing_compound_warned = False
                         for _, row in sample_df.iterrows():
                             compound_name = row.get(id_col)
                             if compound_name is None:
-                                if not missing_compound_warned:
-                                    logger.warning(f"Found rows without {id_col} for sample {sample_id} in {compound_type}")
-                                    missing_compound_warned = True
                                 continue
                             compound_data[compound_name] = row[value_col]
+                            # Store metadata
+                            compound_metadata[compound_name] = {
+                                col: row.get(col) for col in metadata_cols if col in row
+                            }
                 except Exception as e:
                     logger.error(f"Error loading {compound_type} data: {str(e)}", exc_info=True)
             else:
@@ -529,49 +516,26 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             
             # Map the sample's compound data to the study's top compounds
             results = []
-            if compound_type == "metabolites":
-                found_compounds = set()
-                for compound in top_compounds:
-                    # Try both id and name fields
-                    name = compound.get("id") or compound.get("name")
-                    if name:
-                        sample_abundance = compound_data.get(name, 0)
-                        if name in compound_data:
-                            found_compounds.add(name)
-                        results.append({
-                            "id": name,
-                            "abundance": float(sample_abundance) if pd.notna(sample_abundance) else None,
-                            "std_abundance": float(compound.get("std_abundance", 0)) if pd.notna(compound.get("std_abundance")) else None,
-                            "sample_count": int(compound.get("sample_count", 0)) if pd.notna(compound.get("sample_count")) else None
-                        })
-            elif compound_type == "proteins":
-                found_proteins = set()
-                for protein in top_compounds:
-                    name = protein.get("id") or protein.get("name")
-                    if name:
-                        sample_abundance = compound_data.get(name, 0)
-                        if name in compound_data:
-                            found_proteins.add(name)
-                        results.append({
-                            "id": name,
-                            "abundance": float(sample_abundance) if pd.notna(sample_abundance) else None,
-                            "std_abundance": float(protein.get("std_abundance", 0)) if pd.notna(protein.get("std_abundance")) else None,
-                            "sample_count": int(protein.get("sample_count", 0)) if pd.notna(protein.get("sample_count")) else None
-                        })
-            else:
-                # For other types, just show count
-                found_count = sum(1 for compound in top_compounds if (compound.get("id") or compound.get("name")) in compound_data)
-                # Add results for lipids
-                for compound in top_compounds:
-                    name = compound.get("id") or compound.get("name")
-                    if name:
-                        sample_abundance = compound_data.get(name, 0)
-                        results.append({
-                            "id": name,
-                            "abundance": float(sample_abundance) if pd.notna(sample_abundance) else None,
-                            "std_abundance": float(compound.get("std_abundance", 0)) if pd.notna(compound.get("std_abundance")) else None,
-                            "sample_count": int(compound.get("sample_count", 0)) if pd.notna(compound.get("sample_count")) else None
-                        })
+            for compound in top_compounds:
+                name = compound.get("id") or compound.get("name")
+                if name:
+                    sample_abundance = compound_data.get(name, 0)
+                    metadata = compound_metadata.get(name, {})
+                    
+                    result = {
+                        "id": name,
+                        "abundance": float(sample_abundance) if pd.notna(sample_abundance) else None,
+                        "std_abundance": float(compound.get("std_abundance", 0)) if pd.notna(compound.get("std_abundance")) else None,
+                        "sample_count": int(compound.get("sample_count", 0)) if pd.notna(compound.get("sample_count")) else None,
+                        "metadata": metadata
+                    }
+                    
+                    # Add z-score if we have mean and std
+                    if pd.notna(sample_abundance) and pd.notna(compound.get("std_abundance")) and compound.get("std_abundance") != 0:
+                        z_score = (sample_abundance - compound.get("mean_abundance", 0)) / compound.get("std_abundance")
+                        result["z_score"] = float(z_score)
+                    
+                    results.append(result)
             
             return results
             
@@ -580,7 +544,7 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             return []
             
     def _get_top_taxa(self, sample_data: pd.DataFrame, tool: str) -> Dict[str, List[Dict]]:
-        """Get top 10 most abundant taxa for each rank using a specific tool."""
+        """Get top taxa for each rank using a specific tool with detailed metadata."""
         try:
             # Get study ID to look up the top taxa
             study_id = sample_data.iloc[0]["study_id"]
@@ -607,22 +571,29 @@ class SampleAnalysisProcessor(StatisticsProcessor):
             # Get the sample's taxonomic data
             sample_id = sample_data.iloc[0]["id"]
             taxa_data = {}
+            taxa_metadata = {}
             
             # Load the appropriate taxonomic table
             table_path = None
             id_col = None
+            metadata_cols = []
+            
             if tool == "contigs":
                 table_path = self.contigs_table_path
                 id_col = "lineage"
+                metadata_cols = ["gc_content", "length", "coverage", "taxonomy"]
             elif tool == "centrifuge":
                 table_path = self.centrifuge_table_path
                 id_col = "lineage"
+                metadata_cols = ["score", "length", "coverage"]
             elif tool == "kraken":
                 table_path = self.kraken_table_path
                 id_col = "name"
+                metadata_cols = ["taxonomy_id", "rank", "parent_taxonomy_id"]
             elif tool == "gottcha":
                 table_path = self.gottcha_table_path
                 id_col = "label"
+                metadata_cols = ["score", "coverage", "taxonomy"]
                 
             if table_path and table_path.exists():
                 try:
@@ -636,7 +607,12 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                                 continue
                             if rank not in taxa_data:
                                 taxa_data[rank] = {}
+                                taxa_metadata[rank] = {}
                             taxa_data[rank][name] = row.get("abundance", 0)
+                            # Store metadata
+                            taxa_metadata[rank][name] = {
+                                col: row.get(col) for col in metadata_cols if col in row
+                            }
                 except Exception as e:
                     logger.error(f"Error loading {tool} data: {str(e)}")
             else:
@@ -655,15 +631,24 @@ class SampleAnalysisProcessor(StatisticsProcessor):
                         mean_abundance = taxon.get("mean_abundance", 0)
                         std_abundance = taxon.get("std_abundance", 0)
                         sample_count = taxon.get("sample_count", 0)
+                        metadata = taxa_metadata.get(rank, {}).get(taxon_id, {})
                         
-                        results[rank].append({
+                        result = {
                             "id": taxon_id,
                             "name": display_name,
                             "abundance": float(sample_abundance) if pd.notna(sample_abundance) else None,
                             "mean_abundance": float(mean_abundance) if pd.notna(mean_abundance) else None,
                             "std_abundance": float(std_abundance) if pd.notna(std_abundance) else None,
-                            "sample_count": int(sample_count) if pd.notna(sample_count) else None
-                        })
+                            "sample_count": int(sample_count) if pd.notna(sample_count) else None,
+                            "metadata": metadata
+                        }
+                        
+                        # Add z-score if we have mean and std
+                        if pd.notna(sample_abundance) and pd.notna(std_abundance) and std_abundance != 0:
+                            z_score = (sample_abundance - mean_abundance) / std_abundance
+                            result["z_score"] = float(z_score)
+                        
+                        results[rank].append(result)
             
             return results
             

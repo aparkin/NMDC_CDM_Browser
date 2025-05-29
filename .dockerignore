@@ -1,6 +1,49 @@
-# Git
+# Version control
 .git
 .gitignore
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build outputs
+build
+dist
+*.tsbuildinfo
+
+# Environment files
+# .env  # Commented out to allow copying .env file
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+__tests__
+*.test.*
+*.spec.*
+
+# Documentation
+docs
+*.md
+LICENSE
+
+# Other
+*.log
+coverage
+.cache
 
 # Python
 __pycache__/
@@ -37,7 +80,7 @@ yarn-error.log
 *.swo
 
 # Environment
-.env
+# .env  # Commented out to allow copying .env file
 .env.local
 .env.development.local
 .env.test.local

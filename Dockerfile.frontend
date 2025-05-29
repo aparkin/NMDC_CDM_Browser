@@ -1,24 +1,51 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Install TypeScript and other global dependencies
+RUN npm install -g typescript @types/node
+
+# Copy only package files first to leverage cache
 COPY frontend/package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with legacy peer deps to handle React version conflicts
+RUN npm install --legacy-peer-deps
 
-# Copy the rest of the frontend code
-COPY frontend/ .
+# Install @tanstack/react-query explicitly
+RUN npm install @tanstack/react-query --legacy-peer-deps
+
+# Create TypeScript configs
+COPY frontend/tsconfig*.json ./
+COPY frontend/vite.config.ts ./
+
+# Copy only the source files needed for build
+COPY frontend/src/ ./src/
+COPY frontend/public/ ./public/
+COPY frontend/index.html ./
+
+# Create a temporary package.json with modified build script
+RUN npm pkg set scripts.build="vite build"
 
 # Build the application
 RUN npm run build
 
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
 # Install serve to run the built application
 RUN npm install -g serve
+
+# Copy built assets from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Create a non-root user
+RUN adduser -D appuser && chown -R appuser:appuser /app
+USER appuser
 
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Command to run the application
-CMD ["serve", "-s", "build", "-l", "3000"] 
+CMD ["serve", "-s", "dist", "-l", "3000"] 

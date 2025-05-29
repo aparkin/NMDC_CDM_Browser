@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
+  Container,
   Typography,
   Paper,
+  Grid,
+  Tab,
+  Tabs,
   CircularProgress,
   Alert,
-  Tabs,
-  Tab,
-  IconButton,
-  Tooltip,
+  Button,
   FormControl,
   InputLabel,
   Select,
@@ -21,9 +22,9 @@ import type { SelectChangeEvent } from '@mui/material';
 import { MapContainer } from '@/components/MapContainer';
 import SampleStatisticsView from '@/components/SampleStatisticsView';
 import { ResizableContainer } from '@/components/ResizableContainer';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import Plot from 'react-plotly.js';
 import { useSampleAnalysis } from '@/hooks/useSampleAnalysis';
+import SampleAISummary from '../components/SampleAISummary';
 
 interface Sample {
   id: string;
@@ -483,34 +484,11 @@ const SampleDetail = () => {
       {/* AI Summary Container */}
       <ResizableContainer
         title="AI Summary"
-        defaultHeight={200}
-        minHeight={100}
+        defaultHeight={350}
+        minHeight={200}
+        maxHeight={600}
       >
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Sample Analysis Summary</Typography>
-            <Box sx={{ flexGrow: 1 }} />
-            <Tooltip title="Refresh AI Summary">
-              <IconButton size="small">
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-          <Paper 
-            sx={{ 
-              p: 2, 
-              height: 'calc(100% - 48px)', 
-              overflow: 'auto',
-              bgcolor: 'background.default'
-            }}
-          >
-            <Typography variant="body1" color="text.secondary">
-              AI-generated summary of sample analysis will appear here. This will include key findings, 
-              patterns, and insights derived from the sample's data. The summary will be automatically 
-              generated based on the sample's characteristics, measurements, and analysis results.
-            </Typography>
-          </Paper>
-        </Box>
+        <SampleAISummary sampleId={sampleId} />
       </ResizableContainer>
 
       {/* Sample Analysis Container */}

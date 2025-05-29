@@ -1,23 +1,29 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
+    curl \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy only requirements first to leverage cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy only the source code needed for the application
 COPY src/ src/
-COPY data/ data/
-COPY processed_data/ processed_data/
+
+# Copy .env file
+COPY .env .
+
+# Create a non-root user
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
 
 # Expose the port the app runs on
-EXPOSE 8000
+EXPOSE 9000
 
 # Command to run the application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9000"] 

@@ -63,7 +63,7 @@ A web application for browsing and analyzing data from the National Microbiome D
 
 - [API Documentation](docs/api.md)
 - [System Architecture](docs/architecture.md)
-- [Deployment Guide](docs/deployment.md)
+- [Deployment Guide](DEPLOYMENT.md)
 
 ## Dependencies
 
@@ -93,7 +93,7 @@ A web application for browsing and analyzing data from the National Microbiome D
 #### Core
 - FastAPI 0.109.0
 - Uvicorn 0.27.0
-- Python 3.11+
+- Python 3.10+
 
 #### Data Processing
 - Pandas 2.2.0
@@ -131,7 +131,7 @@ A web application for browsing and analyzing data from the National Microbiome D
 
 4. Start the backend server:
    ```bash
-   uvicorn src.api.main:app --reload
+   uvicorn src.api.main:app --reload --port 9000
    ```
 
 #### Frontend Setup
@@ -155,13 +155,62 @@ A web application for browsing and analyzing data from the National Microbiome D
 
 1. Build and start the containers:
    ```bash
-   docker-compose up --build
+   # Build backend
+   podman build -t localhost/nmdc_backend:latest -f Dockerfile.backend .
+   
+   # Build frontend
+   podman build -t localhost/nmdc_frontend:latest -f Dockerfile.frontend .
+   
+   # Run backend
+   podman run -d --name nmdc_backend \
+     --network host \
+     -v ./data:/app/data:ro \
+     -v ./processed_data:/app/processed_data:ro \
+     -e PYTHONUNBUFFERED=1 \
+     -e ENVIRONMENT=production \
+     -e BASE_PATH=/cdm-browser \
+     localhost/nmdc_backend:latest
+   
+   # Run frontend
+   podman run -d --name nmdc_frontend \
+     --network host \
+     localhost/nmdc_frontend:latest
    ```
 
 2. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
+   - Frontend: https://genomics.lbl.gov:3000
+   - Backend API: https://genomics.lbl.gov:9000
+   - API Documentation: https://genomics.lbl.gov:9000/docs
+
+## Environment Configuration
+
+The application requires several environment variables to be set. These are managed through a `.env` file:
+
+```bash
+# API Configuration
+USE_CBORG=true
+OPENAI_API_KEY=your_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+CBORG_API_KEY=your_key_here
+CBORG_BASE_URL=https://api.cborg.lbl.gov
+CBORG_GENERATION_MODEL=anthropic/claude-sonnet
+OPENAI_GENERATION_MODEL=gpt-4-turbo-preview
+
+# Weaviate Configuration
+WEAVIATE_HOST=weaviate.kbase.us
+WEAVIATE_HTTP_PORT=443
+WEAVIATE_GRPC_HOST=weaviate-grpc.kbase.us
+WEAVIATE_GRPC_PORT=443
+
+# NMDC Authentication
+NMDC_REFRESH_TOKEN=your_token_here
+
+# Application Configuration
+ENVIRONMENT=production
+BACKEND_PORT=9000
+FRONTEND_PORT=3000
+BACKEND_URL=http://genomics.lbl.gov:9000
+```
 
 ## Cache Management
 
@@ -222,8 +271,9 @@ The application uses two main data processing scripts:
      - `processed_data/study_summary.json` should contain overall statistics
 
 3. **Docker Issues**
-   - Ensure ports 3000 and 8000 are available
-   - Check Docker logs: `docker-compose logs`
+   - Ensure ports 9000 and 3000 are available
+   - Check Docker logs: `podman logs <container-name>`
+   - Verify environment variables: `podman exec <container-name> env`
 
 4. **Frontend Build Issues**
    - Clear node_modules: `rm -rf frontend/node_modules`

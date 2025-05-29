@@ -10,7 +10,6 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
-import type { GridProps } from '@mui/material';
 import { API_ENDPOINTS } from '@/config/api';
 
 interface Study {

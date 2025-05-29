@@ -83,7 +83,7 @@ const StudyDetail: React.FC = () => {
         // Only fetch analysis data if we have samples
         const analysisResponse = await fetch(API_ENDPOINTS.studies.analysis(studyId));
         if (!analysisResponse.ok) throw new Error('Failed to fetch analysis data');
-        const analysisData = await analysisResponse.json();
+        await analysisResponse.json(); // Just check if the response is valid
 
         // Group samples by location
         const locationMap = new Map<string, any>();

@@ -10,11 +10,20 @@ import {
   Tab,
   IconButton,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import { MapContainer } from '@/components/MapContainer';
 import SampleStatisticsView from '@/components/SampleStatisticsView';
 import { ResizableContainer } from '@/components/ResizableContainer';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import Plot from 'react-plotly.js';
+import { useSampleAnalysis } from '@/hooks/useSampleAnalysis';
 
 interface Sample {
   id: string;
@@ -67,6 +76,11 @@ const SampleDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analysisTabValue, setAnalysisTabValue] = useState(0);
+  const [selectedAnnotationClass, setSelectedAnnotationClass] = useState<string>('product');
+  const [useLogScale, setUseLogScale] = useState(false);
+  const [selectedTaxonomicSource, setSelectedTaxonomicSource] = useState<string>('kraken');
+
+  const { data: sampleAnalysis, isLoading: analysisLoading } = useSampleAnalysis(sampleId);
 
   useEffect(() => {
     const fetchSampleData = async () => {
@@ -111,6 +125,206 @@ const SampleDetail = () => {
 
   const handleAnalysisTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setAnalysisTabValue(newValue);
+  };
+
+  const handleAnnotationClassChange = (event: SelectChangeEvent) => {
+    setSelectedAnnotationClass(event.target.value);
+  };
+
+  const handleTaxonomicSourceChange = (event: SelectChangeEvent) => {
+    setSelectedTaxonomicSource(event.target.value);
+  };
+
+  const renderFunctionalDistribution = () => {
+    if (analysisLoading || !sampleAnalysis) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    const functionalData = sampleAnalysis.functional_analysis;
+    if (!functionalData || Object.keys(functionalData).length === 0) {
+      return (
+        <Alert severity="info">
+          No functional analysis data available for this sample.
+        </Alert>
+      );
+    }
+
+    const annotationClasses = Object.keys(functionalData).filter(cls => {
+      const data = functionalData[cls];
+      return data && Object.keys(data).length > 0;
+    });
+
+    if (annotationClasses.length === 0) {
+      return (
+        <Alert severity="info">
+          No functional analysis data available for this sample.
+        </Alert>
+      );
+    }
+
+    if (!annotationClasses.includes(selectedAnnotationClass)) {
+      setSelectedAnnotationClass(annotationClasses[0]);
+    }
+
+    const selectedData = functionalData[selectedAnnotationClass] || {};
+    const sortedData = Object.entries(selectedData)
+      .map(([label, value]) => ({
+        label: String(label),  // Ensure label is treated as string
+        value: Number(value)   // Ensure value is treated as number
+      }))
+      .sort((a, b) => b.value - a.value)  // Sort by numeric value
+      .slice(0, 20); // Show top 20
+
+    if (sortedData.length === 0) {
+      return (
+        <Alert severity="info">
+          No data available for the selected annotation class.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Annotation Class</InputLabel>
+            <Select
+              value={selectedAnnotationClass}
+              label="Annotation Class"
+              onChange={handleAnnotationClassChange}
+            >
+              {annotationClasses.map(cls => (
+                <MenuItem key={cls} value={cls}>
+                  {cls.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={useLogScale}
+                onChange={(e) => setUseLogScale(e.target.checked)}
+              />
+            }
+            label="Log Scale"
+          />
+        </Box>
+
+        <Box sx={{ height: 400 }}>
+          <Plot
+            data={[
+              {
+                x: sortedData.map(item => item.label),
+                y: sortedData.map(item => item.value),
+                type: 'bar',
+                marker: {
+                  color: '#1976d2'
+                }
+              }
+            ]}
+            layout={{
+              title: `${selectedAnnotationClass.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Distribution`,
+              xaxis: {
+                title: 'Label',
+                tickangle: -45
+              },
+              yaxis: {
+                title: 'Relative Abundance',
+                tickformat: '.1%',
+                type: useLogScale ? 'log' : 'linear',
+                range: useLogScale ? [Math.log10(0.0001), 0] : undefined
+              },
+              margin: { b: 100 }
+            }}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </Box>
+      </Box>
+    );
+  };
+
+  const renderTaxonomicDistribution = () => {
+    if (analysisLoading || !sampleAnalysis) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    const taxonomicData = sampleAnalysis.taxonomic_treemap;
+    if (!taxonomicData || Object.keys(taxonomicData).length === 0) {
+      return (
+        <Alert severity="info">
+          No taxonomic data available for this sample.
+        </Alert>
+      );
+    }
+
+    const availableSources = Object.keys(taxonomicData);
+    if (!availableSources.includes(selectedTaxonomicSource)) {
+      setSelectedTaxonomicSource(availableSources[0]);
+    }
+
+    const selectedData = taxonomicData[selectedTaxonomicSource] || [];
+    if (selectedData.length === 0) {
+      return (
+        <Alert severity="info">
+          No data available for the selected taxonomic source.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Taxonomic Source</InputLabel>
+            <Select
+              value={selectedTaxonomicSource}
+              label="Taxonomic Source"
+              onChange={handleTaxonomicSourceChange}
+            >
+              {availableSources.map(source => (
+                <MenuItem key={source} value={source}>
+                  {source.charAt(0).toUpperCase() + source.slice(1)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Box sx={{ height: 600 }}>
+          <Plot
+            data={[
+              {
+                type: 'treemap',
+                ids: selectedData.map(item => item.ids),
+                labels: selectedData.map(item => item.labels),
+                parents: selectedData.map(item => item.parents),
+                values: selectedData.map(item => item.values),
+                branchvalues: "total",
+                textinfo: "label+value",
+                hovertemplate: '<b>%{label}</b><br>Value: %{value:.1%}<extra></extra>'
+              }
+            ]}
+            layout={{
+              title: `${selectedTaxonomicSource.charAt(0).toUpperCase() + selectedTaxonomicSource.slice(1)} Taxonomic Distribution`,
+              width: undefined,
+              height: undefined,
+              margin: { t: 50, b: 25, l: 25, r: 25 }
+            }}
+            style={{ width: '100%', height: '100%' }}
+            config={{ responsive: true }}
+          />
+        </Box>
+      </Box>
+    );
   };
 
   if (!studyId || !sampleId) {
@@ -302,7 +516,7 @@ const SampleDetail = () => {
       {/* Sample Analysis Container */}
       <ResizableContainer
         title="Sample Analysis"
-        defaultHeight={300}
+        defaultHeight={800}
         minHeight={200}
       >
         <Box sx={{ width: '100%' }}>
@@ -316,25 +530,11 @@ const SampleDetail = () => {
           </Tabs>
 
           <TabPanel value={analysisTabValue} index={0}>
-            <Typography variant="h6" gutterBottom>
-              Taxonomic Distribution
-            </Typography>
-            <Typography color="text.secondary">
-              Taxonomic distribution analysis will be displayed here. This will show the 
-              distribution of different taxa identified in the sample, including their 
-              relative abundances and relationships.
-            </Typography>
+            {renderTaxonomicDistribution()}
           </TabPanel>
 
           <TabPanel value={analysisTabValue} index={1}>
-            <Typography variant="h6" gutterBottom>
-              Functional Distribution
-            </Typography>
-            <Typography color="text.secondary">
-              Functional distribution analysis will be displayed here. This will show the 
-              distribution of functional elements identified in the sample, including 
-              metabolic pathways, gene functions, and other functional characteristics.
-            </Typography>
+            {renderFunctionalDistribution()}
           </TabPanel>
         </Box>
       </ResizableContainer>

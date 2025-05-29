@@ -54,6 +54,16 @@ processor = SampleAnalysisProcessor()
                         "location": {
                             "latitude": 37.7749,
                             "longitude": -122.4194
+                        },
+                        "functional_analysis": {
+                            "product": {
+                                "hypothetical protein": 0.15,
+                                "DNA polymerase": 0.12
+                            },
+                            "pfam": {
+                                "PF00001": 0.08,
+                                "PF00002": 0.05
+                            }
                         }
                     }
                 }

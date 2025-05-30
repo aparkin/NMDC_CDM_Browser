@@ -26,8 +26,8 @@ services:
   frontend:
     container_name: nmdc_frontend
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
       args:
         - BACKEND_URL=${BACKEND_URL:-http://localhost:9000}
     image: localhost/nmdc_frontend:latest

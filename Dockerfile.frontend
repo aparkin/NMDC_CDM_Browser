@@ -8,7 +8,7 @@ COPY frontend/package*.json ./
 
 # Install dependencies
 RUN npm install --legacy-peer-deps
-RUN npm install --save-dev @types/node
+RUN npm install --save-dev @types/node --legacy-peer-deps
 
 # Copy source code
 COPY frontend/ .

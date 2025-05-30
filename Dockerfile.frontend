@@ -26,8 +26,8 @@ RUN npm install -g serve
 # Expose port 3000
 EXPOSE 3000
 
-# Serve the built files with path rewriting
-CMD ["serve", "-s", "dist", "-l", "3000", "--single", "--rewrite", "/cdm-browser/*:/index.html"]
+# Serve the built files
+CMD ["serve", "-s", "dist", "-l", "3000"]
 
 # The built assets will be in /app/dist
 # These can be copied to the server's nginx directory 

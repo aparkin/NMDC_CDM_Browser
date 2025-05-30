@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Typography, Paper, Grid, CircularProgress } from '@mui/material';
+import { API_ENDPOINTS } from '../config/api';
 
 interface Study {
   id: string;
@@ -20,8 +21,14 @@ const StudyDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchStudy = async () => {
+      if (!studyId) {
+        setError('Study ID is required');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:9000'}/api/v1/study/${studyId}`);
+        const response = await fetch(API_ENDPOINTS.studies.detail(studyId));
         if (!response.ok) {
           throw new Error('Failed to fetch study details');
         }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, CircularProgress, Paper, IconButton, Collapse } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
+import { API_ENDPOINTS } from '../config/api';
 
 export interface StatisticsPanelProps {
   studyId: string;
@@ -63,7 +64,7 @@ export const StatisticsPanel: React.FC<StatisticsPanelProps> = ({
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/analysis`);
+        const response = await fetch(API_ENDPOINTS.studies.analysis(studyId));
         if (!response.ok) throw new Error('Failed to fetch statistics');
         const data = await response.json();
         setStats({

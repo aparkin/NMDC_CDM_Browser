@@ -25,6 +25,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { API_ENDPOINTS } from '../config/api';
 
 interface StudyAnalysisProps {
   studyId: string;
@@ -103,7 +104,7 @@ const StudyAnalysis: React.FC<StudyAnalysisProps> = ({ studyId }) => {
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/study/${studyId}/analysis`);
+        const response = await fetch(API_ENDPOINTS.studies.analysis(studyId));
         if (!response.ok) {
           throw new Error('Failed to fetch study analysis');
         }

@@ -30,6 +30,7 @@ export const API_ENDPOINTS = {
     physical: (type: string) => getApiUrl(`api/statistics/physical/${type}`),
     omics: (type: string) => getApiUrl(`api/statistics/omics/${type}`),
     taxonomic: (type: string) => getApiUrl(`api/statistics/taxonomic/${type}`),
+    summary: () => getApiUrl('api/studies/summary'),
   },
   summary: {
     ai: (forceRefresh = false) => getApiUrl(`api/summary/ai${forceRefresh ? '?force=true' : ''}`),

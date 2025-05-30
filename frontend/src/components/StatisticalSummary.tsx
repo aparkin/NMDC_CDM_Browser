@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Paper, Typography, CircularProgress } from '@mui/material';
 import Plot from 'react-plotly.js';
 import axios from 'axios';
+import { API_ENDPOINTS } from '../config/api';
 
 interface SummaryStats {
   total_studies: number;
@@ -67,7 +68,7 @@ const StatisticalSummary: React.FC = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:8000/api/studies/summary');
+        const response = await axios.get(API_ENDPOINTS.statistics.summary());
         
         // Validate response data structure
         if (!response.data || typeof response.data !== 'object') {

@@ -31,7 +31,7 @@ RUN npm install -g serve
 EXPOSE 3000
 
 # Command to serve the application
-CMD ["serve", "-s", "dist", "-l", "3000", "--cors", "--config", "dist/serve.json"]
+CMD ["serve", "-s", "dist", "-l", "3000", "--cors", "--config", "serve.json"]
 
 # The built assets will be in /app/dist
 # These can be copied to the server's nginx directory 

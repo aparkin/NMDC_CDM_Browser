@@ -31,10 +31,10 @@ app = FastAPI(
     * AI-generated summaries
     """,
     version="1.0.0",
-    docs_url="/cdm-browser-api/docs",
-    redoc_url="/cdm-browser-api/redoc",
-    openapi_url="/cdm-browser-api/openapi.json",
-    servers=[{"url": "https://genomics.lbl.gov/cdm-browser-api"}]
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    servers=[{"url": "https://genomics.lbl.gov/cdm-browser-api", "description": "Production server"}]
 )
 
 # Add CORS middleware with more specific configuration

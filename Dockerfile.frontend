@@ -21,8 +21,8 @@ ENV VITE_BASE_URL=/cdm-browser/
 # Build the application
 RUN npm run build
 
-# Create serve configuration
-RUN echo '{"headers": [{"source": "**/*.js", "headers": [{"key": "Content-Type", "value": "application/javascript"}]}]}' > serve.json
+# Create serve configuration in the dist directory
+RUN echo '{"headers": [{"source": "**/*.js", "headers": [{"key": "Content-Type", "value": "application/javascript"}]}]}' > dist/serve.json
 
 # Install serve to run the application
 RUN npm install -g serve
@@ -31,7 +31,7 @@ RUN npm install -g serve
 EXPOSE 3000
 
 # Command to serve the application
-CMD ["serve", "-s", "dist", "-l", "3000", "--cors", "--config", "serve.json"]
+CMD ["serve", "-s", "dist", "-l", "3000", "--cors", "--config", "dist/serve.json"]
 
 # The built assets will be in /app/dist
 # These can be copied to the server's nginx directory 

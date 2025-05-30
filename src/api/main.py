@@ -33,8 +33,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    root_path="/cdm-browser-api"
+    openapi_url="/openapi.json"
 )
 
 # Add CORS middleware with more specific configuration
@@ -47,17 +46,23 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
+# Create a sub-application for the API routes
+api_app = FastAPI()
+
 # Include the statistics router
-app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
+api_app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
 
 # Include the study analysis router
-app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
+api_app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
 
 # Include the studies router
-app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
+api_app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
 
 # Include the samples router
-app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
+api_app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
+
+# Mount the API app under the main app
+app.mount("/cdm-browser-api", api_app)
 
 # Load processed data
 def load_summary_data() -> Dict:

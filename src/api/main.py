@@ -46,23 +46,17 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Create a sub-application for the API routes
-api_app = FastAPI()
-
 # Include the statistics router
-api_app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
+app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
 
 # Include the study analysis router
-api_app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
+app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
 
 # Include the studies router
-api_app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
+app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
 
 # Include the samples router
-api_app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
-
-# Mount the API app under the main app
-app.mount("/cdm-browser-api", api_app)
+app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
 
 # Load processed data
 def load_summary_data() -> Dict:

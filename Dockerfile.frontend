@@ -16,7 +16,6 @@ COPY frontend/ .
 # Set environment variables for build
 ARG BACKEND_URL
 ENV VITE_BACKEND_URL=${BACKEND_URL:-https://genomics.lbl.gov/cdm-browser-api}
-ENV VITE_BASE_URL=/cdm-browser/
 
 # Build the application
 RUN npm run build

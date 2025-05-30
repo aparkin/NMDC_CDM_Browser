@@ -12,9 +12,10 @@ RUN npm install --legacy-peer-deps
 # Copy source code
 COPY frontend/ .
 
-# Set environment variable for build
+# Set environment variables for build
 ARG BACKEND_URL
 ENV VITE_BACKEND_URL=${BACKEND_URL:-http://localhost:9000}
+ENV VITE_BASE_URL=/cdm-browser/
 
 # Build the application
 RUN npm run build

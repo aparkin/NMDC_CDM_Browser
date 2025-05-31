@@ -3,6 +3,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Add build argument for backend URL
+ARG VITE_BACKEND_URL=https://genomics.lbl.gov/cdm-browser-api
+ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
 # Install curl for downloading marker icons
 RUN apk add --no-cache curl
 

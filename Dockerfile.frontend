@@ -3,6 +3,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install sed
+RUN apk add --no-cache sed
+
 # Copy package files
 COPY frontend/package*.json ./
 

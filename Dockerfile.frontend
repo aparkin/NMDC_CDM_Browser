@@ -3,9 +3,6 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install sed
-RUN apk add --no-cache sed
-
 # Copy package files
 COPY frontend/package*.json ./
 
@@ -16,18 +13,11 @@ RUN npm install --save-dev @types/node --legacy-peer-deps
 # Copy source code
 COPY frontend/ .
 
-# Build the application with placeholder URL
-ENV VITE_BACKEND_URL=https://genomics.lbl.gov/cdm-browser-api
+# Build the application
 RUN npm run build
 
 # Install serve to run the built files
 RUN npm install -g serve
-
-# Create a script to replace the backend URL at runtime
-RUN echo '#!/bin/sh\n\
-sed -i "s|https://genomics.lbl.gov/cdm-browser-api|$VITE_BACKEND_URL|g" /app/dist/assets/*.js\n\
-serve -s dist -l 3000 --debug' > /app/start.sh && \
-chmod +x /app/start.sh
 
 # Expose port 3000
 EXPOSE 3000
@@ -35,8 +25,8 @@ EXPOSE 3000
 # Use the official Node.js image's entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Use our custom start script
-CMD ["/app/start.sh"]
+# Serve the built files with debug logging
+CMD ["serve", "-s", "dist", "-l", "3000", "--debug"]
 
 # The built assets will be in /app/dist
 # These can be copied to the server's nginx directory 

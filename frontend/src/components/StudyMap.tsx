@@ -153,4 +153,4 @@ const StudyMap: React.FC<StudyMapProps> = ({ studies, onStudyClick, selectedStud
   );
 };
 
-export default StudyMap; 
+export { StudyMap }; 

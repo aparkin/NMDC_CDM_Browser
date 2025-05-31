@@ -16,7 +16,7 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
-import { MapContainer } from '@/components/MapContainer';
+import MapContainer from '@/components/MapContainer';
 import SampleStatisticsView from '@/components/SampleStatisticsView';
 import { ResizableContainer } from '@/components/ResizableContainer';
 import Plot from 'react-plotly.js';

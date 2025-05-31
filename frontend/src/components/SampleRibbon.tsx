@@ -10,7 +10,7 @@ import {
   Alert,
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
-import { MapContainer } from './MapContainer';
+import MapContainer from './MapContainer';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
 

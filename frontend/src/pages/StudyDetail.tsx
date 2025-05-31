@@ -7,7 +7,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { MapContainer } from '@/components/MapContainer';
+import MapContainer from '@/components/MapContainer';
 import { SampleRibbon } from '@/components/SampleRibbon';
 import { ResizableContainer } from '@/components/ResizableContainer';
 import StudyAISummary from '../components/StudyAISummary';

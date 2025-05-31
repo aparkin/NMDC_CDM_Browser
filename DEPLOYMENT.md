@@ -1,6 +1,6 @@
 # NMDC CDM Browser Deployment Guide
 
-This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers, with specific attention to path handling and nginx configuration.
+This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers, with specific attention to path handling and container configuration.
 
 ## Current Deployment
 
@@ -16,7 +16,7 @@ The NMDC CDM Browser is currently deployed and accessible at:
 2. Git installed on the server
 3. Sufficient disk space for data and containers
 4. Required ports available (default: 9000 for backend, 3000 for frontend)
-5. Nginx proxy configured for HTTPS (if using genomics.lbl.gov)
+5. HTTPS proxy configured for secure access
 
 ## Project Structure and Path Handling
 
@@ -38,13 +38,13 @@ The application is designed to work in two contexts:
 
 To handle this dual context, we use relative paths from the project root in our code, determined by the location of the source files. This ensures consistent behavior in both environments.
 
-## Nginx and URL Configuration
+## Application Paths
 
-The application is served through nginx with the following configuration:
+The application expects to be served with the following paths:
 - Frontend: `https://genomics.lbl.gov/cdm-browser`
 - Backend API: `https://genomics.lbl.gov/cdm-browser-api`
 
-This setup requires specific configuration in both frontend and backend containers.
+These paths are used in the application configuration to ensure proper routing between frontend and backend services.
 
 ## Container Configuration
 
@@ -170,7 +170,7 @@ podman run -d --name nmdc_frontend \
 
 2. **API Connection Issues**
    - Verify the frontend can reach the backend URL
-   - Check nginx configuration for proper routing
+   - Check if the proxy paths are correctly configured
    - Ensure HTTPS is properly configured
 
 3. **Container Startup Issues**
@@ -213,11 +213,6 @@ podman run -d --name nmdc_frontend \
 
 ## Additional Configuration
 
-### Custom Domain Setup
-1. Update `BACKEND_URL` in `.env`
-2. Configure reverse proxy (nginx/apache)
-3. Update SSL certificates if using HTTPS
-
 ### Resource Limits
 Add to docker-compose.yml:
 ```yaml
@@ -230,123 +225,6 @@ services:
         reservations:
           memory: 2G
 ```
-
-## Nginx Proxy Configuration
-
-### Backend Proxy Configuration
-```nginx
-# Backend API proxy
-location /cdm-browser/ {
-    proxy_pass http://localhost:9000/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    
-    # WebSocket support (if needed)
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    
-    # Timeouts
-    proxy_connect_timeout 60s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-}
-
-# OpenAPI documentation
-location /cdm-browser/docs {
-    proxy_pass http://localhost:9000/docs;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-
-location /cdm-browser/openapi.json {
-    proxy_pass http://localhost:9000/openapi.json;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-### Frontend Proxy Configuration
-```nginx
-# Frontend application
-location / {
-    proxy_pass http://localhost:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    
-    # WebSocket support (if needed)
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    
-    # Timeouts
-    proxy_connect_timeout 60s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-}
-```
-
-### SSL Configuration
-```nginx
-server {
-    listen 443 ssl;
-    server_name genomics.lbl.gov;
-
-    ssl_certificate /path/to/certificate.crt;
-    ssl_certificate_key /path/to/private.key;
-    
-    # SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-    
-    # Include the location blocks from above
-    include /etc/nginx/conf.d/nmdc-locations.conf;
-}
-```
-
-### Troubleshooting Nginx
-
-1. **Check Nginx Configuration**
-   ```bash
-   # Test configuration syntax
-   sudo nginx -t
-   
-   # Reload configuration
-   sudo systemctl reload nginx
-   ```
-
-2. **Common Issues**
-   - 502 Bad Gateway: Check if backend/frontend containers are running
-   - 504 Gateway Timeout: Check proxy timeouts and container response times
-   - SSL errors: Verify certificate paths and permissions
-   - 404 Not Found: Check location block paths and proxy_pass URLs
-
-3. **Logs**
-   ```bash
-   # Access logs
-   sudo tail -f /var/log/nginx/access.log
-   
-   # Error logs
-   sudo tail -f /var/log/nginx/error.log
-   ```
-
-4. **Security Considerations**
-   - Keep SSL certificates up to date
-   - Use strong SSL configuration
-   - Implement rate limiting if needed
-   - Consider adding security headers
-   - Regular security audits
 
 ## Support
 

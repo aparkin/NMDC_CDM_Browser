@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
-import { MapContainer as LeafletMap, TileLayer } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import L from 'leaflet';
+import type { Study } from '../types';
+import { configureLeafletIcons, defaultClusterOptions, getStudyColor, mapStyles } from '../utils/mapConfig';
 
 /**
  * StudyMap Component
@@ -21,148 +21,136 @@ import L from 'leaflet';
  * - Automatic bounds fitting to show all markers
  */
 
-// Fix for default marker icons in Leaflet with Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-interface Study {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  sample_count: number;
-  ecosystem?: string;
-  ecosystem_type?: string;
-  ecosystem_subtype?: string;
-  depth?: number;
-  temperature?: number;
-  ph?: number;
-  salinity?: number;
-}
-
 interface StudyMapProps {
   studies: Study[];
-  center?: [number, number];
+  onStudyClick?: (study: Study) => void;
+  selectedStudyId?: string;
 }
 
-export const StudyMap: React.FC<StudyMapProps> = ({ studies, center }) => {
-  const defaultCenter: [number, number] = center || [0, 0];
-  const defaultZoom = 2;
+const StudyMap: React.FC<StudyMapProps> = ({ studies, onStudyClick, selectedStudyId }) => {
   const mapRef = useRef<L.Map | null>(null);
-  const markerClusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersRef = useRef<L.MarkerClusterGroup | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // Generate consistent colors based on study ID
-  const getStudyColor = (studyId: string) => {
-    const colors = [
-      '#1976d2', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9',
-      '#bbdefb', '#e3f2fd', '#1565c0', '#0d47a1', '#1e88e5'
-    ];
-    const hash = studyId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
-  };
+  // Add resize handler
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    // Configure Leaflet icons
+    configureLeafletIcons();
 
-    // Clear existing markers
-    if (markerClusterRef.current) {
-      markerClusterRef.current.clearLayers();
+    // Initialize map if not already initialized
+    if (!mapRef.current && mapContainerRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView([0, 0], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapRef.current);
+
+      // Add custom styles
+      const styleSheet = document.createElement('style');
+      styleSheet.textContent = mapStyles;
+      document.head.appendChild(styleSheet);
+
+      // Initialize marker cluster group
+      markersRef.current = L.markerClusterGroup(defaultClusterOptions);
+      mapRef.current.addLayer(markersRef.current);
     }
 
-    // Create marker cluster group
-    const markerCluster = L.markerClusterGroup({
-      maxClusterRadius: 50,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      disableClusteringAtZoom: 10,
-      // Custom cluster icon
-      iconCreateFunction: (cluster: L.MarkerCluster) => {
-        const markers = cluster.getAllChildMarkers();
-        const count = markers.length;
-        
-        return L.divIcon({
-          html: `<div style="background-color: #1976d2; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-            <span style="font-weight: bold; font-size: 14px;">${count}</span>
-            <small style="font-size: 8px;">studies</small>
-          </div>`,
-          className: 'marker-cluster',
-          iconSize: L.point(40, 40)
+    // Clear existing markers
+    if (markersRef.current) {
+      markersRef.current.clearLayers();
+    }
+
+    // Add markers for each study
+    studies.forEach(study => {
+      if (study.latitude && study.longitude && markersRef.current && mapRef.current) {
+        const color = getStudyColor(study.id);
+        const marker = L.circleMarker([study.latitude, study.longitude], {
+          radius: 8,
+          color: color,
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8,
         });
+
+        // Add popup with study information
+        const popupContent = `
+          <div style="font-family: Arial, sans-serif; padding: 8px;">
+            <h3 style="margin: 0 0 8px 0; color: #333;">${study.name}</h3>
+            <p style="margin: 0 0 4px 0; color: #666;">ID: ${study.id}</p>
+            ${study.description ? `<p style="margin: 0 0 4px 0; color: #666;">${study.description}</p>` : ''}
+            ${study.ecosystem ? `<p style="margin: 0 0 4px 0; color: #666;">Ecosystem: ${study.ecosystem}</p>` : ''}
+            ${study.ecosystem_category ? `<p style="margin: 0 0 4px 0; color: #666;">Category: ${study.ecosystem_category}</p>` : ''}
+            ${study.ecosystem_subtype ? `<p style="margin: 0 0 4px 0; color: #666;">Subtype: ${study.ecosystem_subtype}</p>` : ''}
+            ${study.ecosystem_type ? `<p style="margin: 0 0 4px 0; color: #666;">Type: ${study.ecosystem_type}</p>` : ''}
+            ${study.specific_ecosystem ? `<p style="margin: 0 0 4px 0; color: #666;">Specific: ${study.specific_ecosystem}</p>` : ''}
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+
+        // Add click handler if provided
+        if (onStudyClick) {
+          marker.on('click', () => onStudyClick(study));
+        }
+
+        // Highlight selected study
+        if (study.id === selectedStudyId) {
+          marker.setStyle({
+            radius: 12,
+            weight: 3,
+            fillOpacity: 1
+          });
+        }
+
+        markersRef.current.addLayer(marker);
       }
     });
 
-    // Add markers to cluster
-    studies.forEach((study) => {
-      const marker = L.circleMarker([study.latitude, study.longitude], {
-        radius: Math.max(5, Math.min(15, Math.log(study.sample_count + 1) * 3)),
-        fillColor: getStudyColor(study.id),
-        color: '#fff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8
-      });
-
-      // Create popup content with all available information
-      const popupContent = `
-        <div style="min-width: 200px;">
-          <strong>Study:</strong> ${study.name}<br />
-          <strong>Samples:</strong> ${study.sample_count}<br />
-          <strong>Coordinates:</strong> ${study.latitude.toFixed(4)}, ${study.longitude.toFixed(4)}
-          ${study.ecosystem ? `<br /><strong>Ecosystem:</strong> ${study.ecosystem}` : ''}
-          ${study.ecosystem_type ? `<br /><strong>Ecosystem Type:</strong> ${study.ecosystem_type}` : ''}
-          ${study.ecosystem_subtype ? `<br /><strong>Ecosystem Subtype:</strong> ${study.ecosystem_subtype}` : ''}
-          ${study.depth !== undefined ? `<br /><strong>Depth:</strong> ${study.depth}m` : ''}
-          ${study.temperature !== undefined ? `<br /><strong>Temperature:</strong> ${study.temperature}°C` : ''}
-          ${study.ph !== undefined ? `<br /><strong>pH:</strong> ${study.ph}` : ''}
-          ${study.salinity !== undefined ? `<br /><strong>Salinity:</strong> ${study.salinity}‰` : ''}
-        </div>
-      `;
-
-      marker.bindPopup(popupContent);
-
-      // Add hover tooltip
-      marker.bindTooltip(`${study.name} (${study.sample_count} samples)`);
-
-      markerCluster.addLayer(marker);
-    });
-
-    // Add cluster group to map
-    mapRef.current.addLayer(markerCluster);
-    markerClusterRef.current = markerCluster;
-
-    // Fit map to markers if we have any
-    if (studies.length > 0) {
-      const group = L.featureGroup(markerCluster.getLayers());
-      mapRef.current.fitBounds(group.getBounds().pad(0.005));
+    // Fit map to markers if there are any
+    if (markersRef.current && markersRef.current.getLayers().length > 0 && mapRef.current) {
+      // Use setTimeout to ensure the map is fully initialized
+      setTimeout(() => {
+        if (mapRef.current && markersRef.current) {
+          mapRef.current.fitBounds(markersRef.current.getBounds(), {
+            padding: [50, 50]
+          });
+        }
+      }, 100);
     }
 
     // Cleanup
     return () => {
-      if (markerClusterRef.current) {
-        markerClusterRef.current.clearLayers();
-        markerClusterRef.current = null;
+      if (markersRef.current) {
+        markersRef.current.clearLayers();
+        markersRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
-  }, [studies]);
+  }, [studies, onStudyClick, selectedStudyId]);
 
   return (
-    <Box sx={{ height: '100%', width: '100%' }}>
-      <LeafletMap
-        center={defaultCenter}
-        zoom={defaultZoom}
-        style={{ height: '100%', width: '100%' }}
-        ref={mapRef}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-      </LeafletMap>
-    </Box>
+    <div 
+      ref={mapContainerRef}
+      style={{ 
+        height: '100%', 
+        width: '100%',
+        minHeight: '300px'
+      }} 
+    />
   );
-}; 
+};
+
+export default StudyMap; 

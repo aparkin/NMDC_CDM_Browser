@@ -3,6 +3,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install curl for downloading marker icons
+RUN apk add --no-cache curl
+
 # Copy package files
 COPY frontend/package*.json ./
 
@@ -12,6 +15,12 @@ RUN npm install --save-dev @types/node --legacy-peer-deps
 
 # Copy source code
 COPY frontend/ .
+
+# Download Leaflet marker icons
+RUN mkdir -p public/images && \
+    curl -o public/images/marker-icon.png https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png && \
+    curl -o public/images/marker-icon-2x.png https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png && \
+    curl -o public/images/marker-shadow.png https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png
 
 # Build the application
 RUN npm run build

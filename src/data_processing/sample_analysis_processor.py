@@ -21,11 +21,13 @@ class SampleAnalysisProcessor(StatisticsProcessor):
     
     def __init__(self):
         super().__init__()
-        self.cache_dir = Path("processed_data/sample_analysis_cache")
+        # Get the project root directory (2 levels up from this file)
+        project_root = Path(__file__).parent.parent.parent
+        self.cache_dir = project_root / "processed_data" / "sample_analysis_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # Define table paths
-        data_dir = Path("data")
+        data_dir = project_root / "data"
         self.sample_table_path = data_dir / "sample_table_snappy.parquet"
         self.study_table_path = data_dir / "study_table_snappy.parquet"
         self.contigs_table_path = data_dir / "contigs_table_snappy.parquet"

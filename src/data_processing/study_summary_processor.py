@@ -347,7 +347,8 @@ if __name__ == "__main__":
         summary_data = convert_numpy_types(summary_data)
         
         # Create processed_data directory if it doesn't exist
-        output_dir = Path("processed_data")
+        project_root = Path(__file__).parent.parent.parent
+        output_dir = project_root / "processed_data"
         try:
             output_dir.mkdir(exist_ok=True)
             logger.info(f"Created/verified output directory: {output_dir.absolute()}")

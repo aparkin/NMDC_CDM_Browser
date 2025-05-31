@@ -5,9 +5,15 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:9000';
 export const getApiUrl = (endpoint: string) => {
   // Remove leading slash if present
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-  // Add 'api/' prefix for all endpoints
-  const finalEndpoint = `api/${cleanEndpoint}`;
-  return `${BACKEND_URL}/${finalEndpoint}`;
+  
+  // In development, use the Vite dev server's proxy
+  const isDev = import.meta.env.DEV;
+  if (isDev) {
+    return `/api/${cleanEndpoint}`;
+  }
+  
+  // In production, use the full URL with api prefix
+  return `${BACKEND_URL}/api/${cleanEndpoint}`;
 };
 
 // Common API endpoints

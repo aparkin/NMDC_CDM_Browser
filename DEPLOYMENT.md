@@ -1,6 +1,14 @@
 # NMDC CDM Browser Deployment Guide
 
-This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers.
+This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers, with specific attention to path handling and nginx configuration.
+
+## Current Deployment
+
+The NMDC CDM Browser is currently deployed and accessible at:
+- Main Application: [https://cdmbrowser.genomics.lbl.gov/](https://cdmbrowser.genomics.lbl.gov/)
+- API Documentation: 
+  - [Swagger UI](https://genomics.lbl.gov/cdm-browser-api/docs)
+  - [ReDoc](https://genomics.lbl.gov/cdm-browser-api/redoc)
 
 ## Prerequisites
 
@@ -10,20 +18,35 @@ This guide explains how to deploy the NMDC CDM Browser using Podman on remote se
 4. Required ports available (default: 9000 for backend, 3000 for frontend)
 5. Nginx proxy configured for HTTPS (if using genomics.lbl.gov)
 
-## Project Structure
+## Project Structure and Path Handling
 
 ```
 .
-├── data/                  # Raw data files
+├── data/                  # Raw data files (mounted read-only in container)
 ├── frontend/             # React frontend application
-├── processed_data/       # Processed data files
+├── processed_data/       # Processed data files (mounted read-write in container)
 ├── src/                  # Backend code
 ├── Dockerfile.backend    # Backend container definition
-├── Dockerfile.frontend   # Frontend container definition
-└── docker-compose.yml    # Container orchestration
+└── Dockerfile.frontend   # Frontend container definition
 ```
 
-## Docker Setup
+### Path Handling Philosophy
+
+The application is designed to work in two contexts:
+1. **Development Environment**: Running directly on the host machine
+2. **Container Environment**: Running inside Podman containers
+
+To handle this dual context, we use relative paths from the project root in our code, determined by the location of the source files. This ensures consistent behavior in both environments.
+
+## Nginx and URL Configuration
+
+The application is served through nginx with the following configuration:
+- Frontend: `https://genomics.lbl.gov/cdm-browser`
+- Backend API: `https://genomics.lbl.gov/cdm-browser-api`
+
+This setup requires specific configuration in both frontend and backend containers.
+
+## Container Configuration
 
 ### Backend Container (Dockerfile.backend)
 ```dockerfile
@@ -43,9 +66,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy only the source code needed for the application
 COPY src/ src/
-
-# Copy .env file
-COPY .env .
 
 # Create a non-root user
 RUN useradd -m appuser && chown -R appuser:appuser /app
@@ -68,7 +88,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the frontend code
 COPY frontend/ .
@@ -84,140 +104,79 @@ EXPOSE 3000
 CMD ["serve", "-s", "dist", "-l", "3000"]
 ```
 
-## Environment Configuration
+## Deployment Process
 
-### Environment Variables
-The application requires several environment variables to be set. These are managed through a `.env` file in the root directory:
-
+### Full Update Process
 ```bash
-# API Configuration
-USE_CBORG=true
-OPENAI_API_KEY=your_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-CBORG_API_KEY=your_key_here
-CBORG_BASE_URL=https://api.cborg.lbl.gov
-CBORG_GENERATION_MODEL=anthropic/claude-sonnet
-OPENAI_GENERATION_MODEL=gpt-4-turbo-preview
+# 1. Pull latest changes
+git pull origin main
 
-# Weaviate Configuration
-WEAVIATE_HOST=weaviate.kbase.us
-WEAVIATE_HTTP_PORT=443
-WEAVIATE_GRPC_HOST=weaviate-grpc.kbase.us
-WEAVIATE_GRPC_PORT=443
+# 2. Stop and remove existing containers
+podman stop nmdc_backend & podman rm nmdc_backend
+podman stop nmdc_frontend & podman rm nmdc_frontend
 
-# NMDC Authentication
-NMDC_REFRESH_TOKEN=your_token_here
-
-# Application Configuration
-ENVIRONMENT=production
-BACKEND_PORT=9000
-FRONTEND_PORT=3000
-BACKEND_URL=http://genomics.lbl.gov:9000
-```
-
-### Environment Variable Handling
-1. The `.env` file is used by both frontend and backend
-2. For the frontend:
-   - In development: Vite automatically loads the root `.env` file
-   - In production: `BACKEND_URL` is passed to the container as `VITE_BACKEND_URL`
-3. For the backend:
-   - The `.env` file is copied into the container during build
-   - Environment variables are loaded at runtime using python-dotenv
-
-## Container Management
-
-### Building Containers
-```bash
-# Build backend
+# 3. Build containers
 podman build -t localhost/nmdc_backend:latest -f Dockerfile.backend .
+podman build -t localhost/nmdc_frontend:latest -f Dockerfile.frontend .
 
-# Build frontend
-podman build -t localhost/nmdc_frontend:latest \
-  --build-arg BACKEND_URL=${BACKEND_URL:-http://localhost:9000} \
-  -f Dockerfile.frontend .
-```
-
-### Running Containers
-```bash
-# Run backend
+# 4. Run backend container
 podman run -d --name nmdc_backend \
   --network host \
   -v ./data:/app/data:ro \
-  -v ./processed_data:/app/processed_data:ro \
+  -v ./processed_data:/app/processed_data \
   -e PYTHONUNBUFFERED=1 \
   -e ENVIRONMENT=production \
   -e BASE_PATH=/cdm-browser \
   localhost/nmdc_backend:latest
 
-# Run frontend
+# 5. Run frontend container
 podman run -d --name nmdc_frontend \
-  --network host \
-  -e VITE_BACKEND_URL=${BACKEND_URL:-http://localhost:9000} \
+  -p 3000:3000 \
+  -e VITE_BACKEND_URL=https://genomics.lbl.gov/cdm-browser-api \
   localhost/nmdc_frontend:latest
 ```
 
-### Viewing Logs
-```bash
-# Backend logs
-podman logs -f nmdc_backend
+### Volume Mounts Explained
 
-# Frontend logs
-podman logs -f nmdc_frontend
-```
+1. **Data Directory** (`./data:/app/data:ro`)
+   - Mounted read-only
+   - Contains raw data files
+   - Used by backend for data processing
 
-### Stopping Containers
-```bash
-# Stop containers
-podman stop nmdc_backend nmdc_frontend
-podman rm nmdc_backend nmdc_frontend
-```
+2. **Processed Data Directory** (`./processed_data:/app/processed_data`)
+   - Mounted read-write
+   - Contains processed data and cache files
+   - Created by backend during processing
+   - Persists between container restarts
 
-## Data Persistence
+### Environment Variables
 
-The application uses two volume mounts:
-- `./data:/app/data:ro` - Raw data files (read-only)
-- `./processed_data:/app/processed_data:ro` - Processed data and cache (read-only)
+1. **Backend Environment Variables**
+   - `PYTHONUNBUFFERED=1`: Ensures Python output is not buffered
+   - `ENVIRONMENT=production`: Sets the environment mode
+   - `BASE_PATH=/cdm-browser`: Sets the base path for the API
 
-Ensure these directories exist and have proper permissions:
-```bash
-mkdir -p data processed_data
-chmod 755 data processed_data
-```
+2. **Frontend Environment Variables**
+   - `VITE_BACKEND_URL=https://genomics.lbl.gov/cdm-browser-api`: Sets the backend API URL
 
 ## Troubleshooting
 
-### Container Won't Start
-1. Check logs: `podman logs <container-name>`
-2. Verify port availability: `netstat -tulpn | grep <port>`
-3. Check disk space: `df -h`
-4. Verify environment variables: `podman exec <container-name> env`
+### Common Issues
 
-### Network Issues
-1. Verify port mappings: `podman port <container-name>`
-2. Check firewall rules
-3. Test connectivity: `curl https://genomics.lbl.gov:9000/api/health`
+1. **Path Issues**
+   - If processed_data is created in the wrong location, check the volume mount
+   - Ensure the host directory exists and has correct permissions
+   - Verify the container can write to the mounted directory
 
-### Environment Variable Issues
-1. Check if .env file is copied: `podman exec <container-name> ls -la /app/.env`
-2. Verify environment variables: `podman exec <container-name> env`
-3. Check application logs for environment loading messages
+2. **API Connection Issues**
+   - Verify the frontend can reach the backend URL
+   - Check nginx configuration for proper routing
+   - Ensure HTTPS is properly configured
 
-## Security Considerations
-
-1. **Firewall Configuration**
-   ```bash
-   # Allow required ports
-   sudo firewall-cmd --permanent --add-port=9000/tcp
-   sudo firewall-cmd --permanent --add-port=3000/tcp
-   sudo firewall-cmd --reload
-   ```
-
-2. **Container Security**
-   - Run containers as non-root user
-   - Use read-only volumes where possible
-   - Keep containers updated
-   - Secure environment variables
-   - Use HTTPS through nginx proxy
+3. **Container Startup Issues**
+   - Check container logs: `podman logs <container-name>`
+   - Verify environment variables: `podman exec <container-name> env`
+   - Check volume mounts: `podman inspect <container-name>`
 
 ## Maintenance
 
@@ -229,14 +188,12 @@ chmod 755 data processed_data
 
 ### Backup
 1. Regular backups of processed_data directory
-2. Backup of .env file
-3. Document any custom configurations
+2. Document any custom configurations
 
 ### Monitoring
 1. Check container logs regularly
 2. Monitor disk space usage
 3. Monitor API response times
-4. Check for any security updates
 
 ## Backup and Recovery
 

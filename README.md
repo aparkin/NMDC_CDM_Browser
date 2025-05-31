@@ -1,18 +1,117 @@
 # NMDC CDM Browser
 
-A web application for browsing and analyzing data from the National Microbiome Data Collaborative (NMDC) Common Data Model (CDM).
+A web-based browser for exploring and analyzing NMDC (National Microbiome Data Collaborative) Common Data Model (CDM) data. This application provides an interactive interface for researchers to explore microbiome studies, their associated samples, and various omics measurements.
 
-## Features
+## Overview
 
-- Interactive map visualization of study locations
-- Detailed study information and metadata
-- Statistical analysis of omics data
-- Timeline visualization of data collection
-- Ecosystem distribution analysis
-- Physical variable statistics
-- Omics data analysis (metabolomics, lipidomics, proteomics)
-- Taxonomic analysis
-- AI-generated compendium summary with comprehensive analysis
+The NMDC CDM Browser provides a unified interface for:
+- Exploring microbiome studies and their metadata
+- Viewing sample locations and distributions
+- Analyzing various omics measurements (metagenomics, metabolomics, etc.)
+- Understanding ecosystem classifications and relationships
+- Accessing processed data and analysis results
+
+## Key Features
+
+### Study Exploration
+- Interactive map showing study locations
+- Detailed study cards with metadata
+- Filtering and search capabilities
+- Ecosystem classification visualization
+
+### Sample Analysis
+- Sample location mapping
+- Measurement type filtering
+- Statistical summaries
+- Data quality indicators
+
+### Omics Integration
+- Metagenomics data
+- Metabolomics results
+- Proteomics measurements
+- Lipidomics analysis
+- MAGs (Metagenome-Assembled Genomes) information
+
+### Data Visualization
+- Interactive maps for geographical distribution
+- Statistical summaries and distributions
+- Ecosystem classification trees
+- Measurement type comparisons
+
+## Getting Started
+
+### Accessing the Application
+The NMDC CDM Browser is available at:
+- Main Application: [https://cdmbrowser.genomics.lbl.gov/](https://cdmbrowser.genomics.lbl.gov/)
+- API Documentation: 
+  - [Swagger UI](https://genomics.lbl.gov/cdm-browser-api/docs)
+  - [ReDoc](https://genomics.lbl.gov/cdm-browser-api/redoc)
+
+### Using the Interface
+
+1. **Study Overview**
+   - The main page shows a map of all studies
+   - Use the search bar to find specific studies
+   - Click on study cards to view detailed information
+
+2. **Study Details**
+   - View comprehensive study metadata
+   - Explore sample distributions
+   - Access measurement statistics
+   - Review ecosystem classifications
+
+3. **Sample Analysis**
+   - Navigate to sample details from study pages
+   - View sample locations on the map
+   - Access measurement data
+   - Review quality metrics
+
+4. **Data Export**
+   - Download study metadata
+   - Export sample information
+   - Access measurement data
+   - Retrieve analysis results
+
+## Data Types
+
+The browser supports various types of omics data:
+- Metagenomics
+- Metatranscriptomics
+- Metabolomics
+- Proteomics
+- Lipidomics
+- MAGs analysis
+- Read-based analysis
+- NOM (Natural Organic Matter) analysis
+
+## Ecosystem Classification
+
+Studies are classified according to:
+- Primary ecosystem
+- Ecosystem category
+- Ecosystem type
+- Ecosystem subtype
+- Specific ecosystem characteristics
+
+## Contributing
+
+We welcome contributions to the NMDC CDM Browser. Please see our [Contributing Guidelines](CONTRIBUTING.md) for more information.
+
+## Support
+
+For issues, questions, or feedback:
+1. Check the [documentation](docs/)
+2. Review the [API documentation](https://genomics.lbl.gov/cdm-browser-api/docs)
+3. Contact the development team
+
+## License
+
+[Add appropriate license information]
+
+## Acknowledgments
+
+- NMDC Consortium
+- [Add other relevant acknowledgments]
 
 ## Project Structure
 

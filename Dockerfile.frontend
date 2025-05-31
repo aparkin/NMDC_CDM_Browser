@@ -29,8 +29,8 @@ EXPOSE 3000
 # Use the official Node.js image's entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Serve the built files
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Serve the built files with debug logging
+CMD ["serve", "-s", "dist", "-l", "3000", "--debug"]
 
 # The built assets will be in /app/dist
 # These can be copied to the server's nginx directory 

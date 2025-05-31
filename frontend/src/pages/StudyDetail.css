@@ -1,0 +1,40 @@
+.study-map-stats {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.map-container {
+  flex: 1;
+  min-width: 0; /* Prevent flex item from overflowing */
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.study-statistics {
+  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow-y: auto;
+  max-height: 400px; /* Match map height */
+}
+
+@media (max-width: 768px) {
+  .study-map-stats {
+    flex-direction: column;
+  }
+
+  .map-container {
+    height: 300px;
+  }
+
+  .study-statistics {
+    max-width: none;
+    max-height: none;
+  }
+} 

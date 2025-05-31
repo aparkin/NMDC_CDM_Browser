@@ -7,12 +7,14 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { MapContainer } from '@/components/MapContainer';
+import MapContainer from '@/components/MapContainer';
 import { SampleRibbon } from '@/components/SampleRibbon';
 import { ResizableContainer } from '@/components/ResizableContainer';
 import StudyAISummary from '../components/StudyAISummary';
-import StudyStatisticsView from '../components/StudyStatisticsView';
+import StudyStatisticsView from '@/components/StudyStatisticsView';
 import { API_ENDPOINTS } from '../config/api';
+import type { Sample } from '@/types';
+import './StudyDetail.css';
 
 interface Study {
   id: string;
@@ -57,6 +59,9 @@ const StudyDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasSamples, setHasSamples] = useState(true);
+  const [selectedSampleId, setSelectedSampleId] = useState<string | undefined>(undefined);
+  const [targetSampleId, setTargetSampleId] = useState<string | undefined>(undefined);
+  const [highlightSampleId, setHighlightSampleId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -144,6 +149,12 @@ const StudyDetail: React.FC = () => {
     fetchData();
   }, [studyId]);
 
+  const handleSampleClick = (sample: Sample) => {
+    setSelectedSampleId(sample.id);
+    setTargetSampleId(sample.id);
+    setHighlightSampleId(sample.id);
+  };
+
   if (!studyId) {
     return (
       <Box sx={{ p: 3 }}>
@@ -223,7 +234,13 @@ const StudyDetail: React.FC = () => {
       >
         <Box sx={{ display: 'flex', height: '100%' }}>
           <Box sx={{ flex: 1, p: 2, minWidth: '20%' }}>
-            <MapContainer locations={study.sample_locations} />
+            <MapContainer
+              locations={study.sample_locations}
+              onSampleClick={handleSampleClick}
+              selectedSampleId={selectedSampleId}
+              targetSampleId={targetSampleId}
+              highlightSampleId={highlightSampleId}
+            />
           </Box>
           <Box sx={{ flex: 1, p: 2, borderLeft: 1, borderColor: 'divider', minWidth: '20%' }}>
             <StudyStatisticsView studyId={studyId} />
@@ -254,4 +271,48 @@ const StudyDetail: React.FC = () => {
   );
 };
 
-export default StudyDetail; 
+export default StudyDetail;
+
+// Add these styles to your CSS
+const styles = `
+  .study-map-stats {
+    display: flex;
+    gap: 20px;
+    margin: 20px 0;
+  }
+
+  .map-container {
+    flex: 1;
+    min-width: 0; /* Prevent flex item from overflowing */
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .study-statistics {
+    flex: 1;
+    min-width: 300px;
+    max-width: 400px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-y: auto;
+    max-height: 400px; /* Match map height */
+  }
+
+  @media (max-width: 768px) {
+    .study-map-stats {
+      flex-direction: column;
+    }
+
+    .map-container {
+      height: 300px;
+    }
+
+    .study-statistics {
+      max-width: none;
+      max-height: none;
+    }
+  }
+`; 

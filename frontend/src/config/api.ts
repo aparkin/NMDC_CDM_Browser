@@ -5,8 +5,9 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:9000';
 export const getApiUrl = (endpoint: string) => {
   // Remove leading slash if present
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-  // Remove 'api/' prefix if it exists in the endpoint
-  const finalEndpoint = cleanEndpoint.startsWith('api/') ? cleanEndpoint.slice(4) : cleanEndpoint;
+  // For local development, we need to add 'api/' prefix
+  const isLocalDev = BACKEND_URL.includes('localhost');
+  const finalEndpoint = isLocalDev ? `api/${cleanEndpoint}` : cleanEndpoint;
   return `${BACKEND_URL}/${finalEndpoint}`;
 };
 

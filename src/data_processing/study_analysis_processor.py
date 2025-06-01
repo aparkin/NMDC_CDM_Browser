@@ -60,16 +60,21 @@ class StudyAnalysisProcessor(StatisticsProcessor):
         invalid_count = 0
         error_count = 0
         
+        # Get the latest modification time of source files
+        source_mod_time = self._get_latest_file_modification()
+        logger.info(f"Latest source file modification time: {datetime.fromtimestamp(source_mod_time)}")
+        
         for cache_file in cache_files:
             try:
-                with open(cache_file, 'r') as f:
-                    cached_data = json.load(f)
+                # Get the cache file's modification time
+                cache_mod_time = os.path.getmtime(cache_file)
+                logger.info(f"Cache file {cache_file.name} modification time: {datetime.fromtimestamp(cache_mod_time)}")
                 
                 # Get the study ID from the filename
                 study_id = cache_file.stem
                 
-                # Check if cache is newer than source files
-                if cached_data.get('last_file_modification', 0) > self.last_file_modification:
+                # Check if cache file is newer than source files
+                if cache_mod_time > source_mod_time:
                     valid_count += 1
                     logger.info(f"Cache valid for study {study_id}: newer than source files")
                 else:
@@ -95,10 +100,11 @@ class StudyAnalysisProcessor(StatisticsProcessor):
         cache_path = self._get_cache_path(study_id)
         if cache_path.exists():
             try:
-                with open(cache_path, 'r') as f:
-                    cached_data = json.load(f)
-                # Check if cache is newer than source files
-                if cached_data.get('last_file_modification', 0) > self.last_file_modification:
+                # Check if cache file is newer than source files
+                cache_mod_time = os.path.getmtime(cache_path)
+                if cache_mod_time > self.last_file_modification:
+                    with open(cache_path, 'r') as f:
+                        cached_data = json.load(f)
                     logger.info(f"Using cached analysis for study {study_id}")
                     return cached_data.get('analysis')
                 else:

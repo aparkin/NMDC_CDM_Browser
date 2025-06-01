@@ -1,6 +1,6 @@
 # NMDC CDM Browser Deployment Guide
 
-This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers, with specific attention to path handling and container configuration.
+This guide explains how to deploy the NMDC CDM Browser using Podman on remote servers, with specific attention to path handling, container configuration, and permissions.
 
 ## Current Deployment
 
@@ -17,6 +17,7 @@ The NMDC CDM Browser is currently deployed and accessible at:
 3. Sufficient disk space for data and containers
 4. Required ports available (default: 9000 for backend, 3000 for frontend)
 5. HTTPS proxy configured for secure access
+6. Access to `/opt/shared/{$USER}` directory for writable storage
 
 ## Project Structure and Path Handling
 
@@ -67,9 +68,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy only the source code needed for the application
 COPY src/ src/
 
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+# Copy .env file
+COPY .env .
 
 # Expose the port the app runs on
 EXPOSE 9000
@@ -123,7 +123,7 @@ podman build -t localhost/nmdc_frontend:latest -f Dockerfile.frontend .
 podman run -d --name nmdc_backend \
   --network host \
   -v ./data:/app/data:ro \
-  -v ./processed_data:/app/processed_data \
+  -v /opt/shared/$USER/processed_data:/app/processed_data \
   -e PYTHONUNBUFFERED=1 \
   -e ENVIRONMENT=production \
   -e BASE_PATH=/cdm-browser \
@@ -143,11 +143,12 @@ podman run -d --name nmdc_frontend \
    - Contains raw data files
    - Used by backend for data processing
 
-2. **Processed Data Directory** (`./processed_data:/app/processed_data`)
+2. **Processed Data Directory** (`/opt/shared/$USER/processed_data:/app/processed_data`)
    - Mounted read-write
    - Contains processed data and cache files
    - Created by backend during processing
    - Persists between container restarts
+   - Must be in `/opt/shared/$USER` to ensure proper permissions
 
 ### Environment Variables
 
@@ -163,17 +164,23 @@ podman run -d --name nmdc_frontend \
 
 ### Common Issues
 
-1. **Path Issues**
+1. **Permission Issues**
+   - If you encounter permission denied errors, ensure processed_data is in `/opt/shared/$USER`
+   - The container runs as root by default, which is fine for our use case
+   - Avoid using NFS mounts for writable directories
+
+2. **Path Issues**
    - If processed_data is created in the wrong location, check the volume mount
    - Ensure the host directory exists and has correct permissions
    - Verify the container can write to the mounted directory
 
-2. **API Connection Issues**
+3. **API Connection Issues**
    - Verify the frontend can reach the backend URL
    - Check if the proxy paths are correctly configured
    - Ensure HTTPS is properly configured
+   - Check that API endpoints don't have conflicting v1 prefixes
 
-3. **Container Startup Issues**
+4. **Container Startup Issues**
    - Check container logs: `podman logs <container-name>`
    - Verify environment variables: `podman exec <container-name> env`
    - Check volume mounts: `podman inspect <container-name>`
@@ -198,18 +205,15 @@ podman run -d --name nmdc_frontend \
 ## Backup and Recovery
 
 1. **Backup Data**
-   ```bash
-   # Backup data directory
-   tar -czf data_backup.tar.gz data/
-   tar -czf processed_data_backup.tar.gz processed_data/
-   ```
+   - Regularly backup the processed_data directory
+   - Keep a copy of the raw data files
+   - Document any custom configurations
 
-2. **Restore Data**
-   ```bash
-   # Restore from backup
-   tar -xzf data_backup.tar.gz
-   tar -xzf processed_data_backup.tar.gz
-   ```
+2. **Recovery Process**
+   - Restore from backup
+   - Rebuild containers
+   - Verify all paths and permissions
+   - Test API endpoints
 
 ## Additional Configuration
 

@@ -52,13 +52,13 @@ app.add_middleware(
 app.include_router(statistics.router, prefix="/api/statistics", tags=["statistics"])
 
 # Include the study analysis router
-app.include_router(study_analysis_router, prefix="/api/v1", tags=["study-analysis"])
+app.include_router(study_analysis_router, prefix="/api", tags=["study-analysis"])
 
 # Include the studies router
-app.include_router(studies.router, prefix="/api/v1/study", tags=["studies"])
+app.include_router(studies.router, prefix="/api/study", tags=["studies"])
 
 # Include the samples router
-app.include_router(samples.router, prefix="/api/v1/sample", tags=["samples"])
+app.include_router(samples.router, prefix="/api/sample", tags=["samples"])
 
 # Load processed data
 def load_summary_data() -> Dict:

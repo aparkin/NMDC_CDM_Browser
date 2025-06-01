@@ -18,10 +18,6 @@ COPY src/ src/
 # Copy .env file
 COPY .env .
 
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
-
 # Expose the port the app runs on
 EXPOSE 9000
 

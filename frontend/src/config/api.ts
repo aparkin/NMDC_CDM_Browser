@@ -1,5 +1,8 @@
 // Get the backend URL from environment variable
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:9000';
+console.log('Environment:', import.meta.env.MODE);
+console.log('BACKEND_URL:', BACKEND_URL);
+console.log('All env vars:', import.meta.env);
 
 // Helper function to construct API URLs
 export const getApiUrl = (endpoint: string) => {

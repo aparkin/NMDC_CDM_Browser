@@ -30,8 +30,13 @@ class StudyAnalysisProcessor(StatisticsProcessor):
         self.data_dir = Path(data_dir) if data_dir else project_root / "data"
         self.cache_dir = project_root / "processed_data" / "study_analysis_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Current file: {__file__}")
+        logger.info(f"Project root: {project_root}")
         logger.info(f"Using data directory: {self.data_dir.absolute()}")
         logger.info(f"Using cache directory: {self.cache_dir.absolute()}")
+        logger.info(f"Cache directory exists: {self.cache_dir.exists()}")
+        if self.cache_dir.exists():
+            logger.info(f"Cache directory contents: {list(self.cache_dir.glob('*.json'))}")
         self._study_df = None
         self._sample_df = None
         self.cache = {}
@@ -49,10 +54,12 @@ class StudyAnalysisProcessor(StatisticsProcessor):
             try:
                 with open(cache_path, 'r') as f:
                     cached_data = json.load(f)
-                # Check if cache is still valid
-                if cached_data.get('last_file_modification', 0) >= self.last_file_modification:
+                # Check if cache is newer than source files
+                if cached_data.get('last_file_modification', 0) > self.last_file_modification:
                     logger.info(f"Using cached analysis for study {study_id}")
                     return cached_data.get('analysis')
+                else:
+                    logger.info(f"Cache is older than source files for study {study_id}")
             except Exception as e:
                 logger.warning(f"Error loading cache for study {study_id}: {str(e)}")
         return None

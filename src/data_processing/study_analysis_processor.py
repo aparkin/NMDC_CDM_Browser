@@ -43,6 +43,49 @@ class StudyAnalysisProcessor(StatisticsProcessor):
         self.last_file_modification = self._get_latest_file_modification()
         self.show_progress = True  # Flag to control progress bar display
         
+        # Validate cache at startup
+        self._validate_cache_at_startup()
+        
+    def _validate_cache_at_startup(self) -> None:
+        """Validate all cache files at startup and report their status."""
+        logger.info("Validating cache files at startup...")
+        cache_files = list(self.cache_dir.glob('*.json'))
+        logger.info(f"Found {len(cache_files)} cache files")
+        
+        # Skip AI summary files
+        cache_files = [f for f in cache_files if not f.name.endswith('_ai_summary.json')]
+        logger.info(f"Found {len(cache_files)} study analysis cache files (excluding AI summaries)")
+        
+        valid_count = 0
+        invalid_count = 0
+        error_count = 0
+        
+        for cache_file in cache_files:
+            try:
+                with open(cache_file, 'r') as f:
+                    cached_data = json.load(f)
+                
+                # Get the study ID from the filename
+                study_id = cache_file.stem
+                
+                # Check if cache is newer than source files
+                if cached_data.get('last_file_modification', 0) > self.last_file_modification:
+                    valid_count += 1
+                    logger.info(f"Cache valid for study {study_id}: newer than source files")
+                else:
+                    invalid_count += 1
+                    logger.info(f"Cache invalid for study {study_id}: older than source files")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Error validating cache for {cache_file.name}: {str(e)}")
+        
+        logger.info(f"Cache validation complete:")
+        logger.info(f"  - Valid caches: {valid_count}")
+        logger.info(f"  - Invalid caches: {invalid_count}")
+        logger.info(f"  - Error reading caches: {error_count}")
+        logger.info(f"  - Total cache files: {len(cache_files)}")
+        
     def _get_cache_path(self, study_id: str) -> Path:
         """Get the cache file path for a study."""
         return self.cache_dir / f"{study_id}.json"

@@ -23,17 +23,17 @@ export const getApiUrl = (endpoint: string) => {
 export const API_ENDPOINTS = {
   studies: {
     list: () => getApiUrl('studies/cards'),
-    detail: (studyId: string) => getApiUrl(`v1/study/${studyId}`),
-    analysis: (studyId: string) => getApiUrl(`v1/study/${studyId}/analysis`),
-    samples: (studyId: string) => getApiUrl(`v1/study/${studyId}/samples`),
+    detail: (studyId: string) => getApiUrl(`study/${studyId}`),
+    analysis: (studyId: string) => getApiUrl(`study/${studyId}/analysis`),
+    samples: (studyId: string) => getApiUrl(`study/${studyId}/samples`),
     aiSummary: (studyId: string, forceRefresh = false) => 
       getApiUrl(`studies/${studyId}/summary/ai${forceRefresh ? '?force=true' : ''}`),
   },
   samples: {
-    detail: (sampleId: string) => getApiUrl(`v1/sample/${sampleId}`),
-    analysis: (sampleId: string) => getApiUrl(`v1/sample/${sampleId}/analysis`),
+    detail: (sampleId: string) => getApiUrl(`sample/${sampleId}`),
+    analysis: (sampleId: string) => getApiUrl(`sample/${sampleId}/analysis`),
     aiSummary: (sampleId: string, forceRefresh = false) => 
-      getApiUrl(`v1/sample/${sampleId}/summary/ai${forceRefresh ? '?force=true' : ''}`),
+      getApiUrl(`sample/${sampleId}/summary/ai${forceRefresh ? '?force=true' : ''}`),
   },
   statistics: {
     timeline: () => getApiUrl('statistics/timeline'),
